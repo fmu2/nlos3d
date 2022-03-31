@@ -1,0 +1,24 @@
+dataset:
+  root: ./data/real/objects_1211
+  res: 2cm
+  split: 384x256x256
+  clip: 384
+  scale: 1
+  background: 0
+  target_size: 256
+  color: g
+
+rsd:
+  t: 384
+  d: 64
+  h: 256
+  w: 256
+  wall_size: 2
+  bin_len: 0.02
+  zmin: 0.5
+  zmax: 2.5
+  scale_coef: 4
+  n_cycles: 4
+  ratio: 0.1
+
+batch_size: 1
