@@ -60,6 +60,8 @@ def main(args):
         rsd = nn.DataParallel(rsd)
     rsd.eval()
 
+    print(save_path)
+    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
     idx = 1
     for (meas, target, _) in loader:
         meas = meas.cuda(non_blocking=True)
@@ -84,7 +86,7 @@ def main(args):
 
         for i in range(len(x)):
             im = Image.fromarray(x[i])
-            im.save(os.path.join(save_path, '{:04d}.png').format(idx))
+            im.save(os.path.join(save_path, ('{:04d}.png').format(idx)))
             idx += 1
 
 ################################################################################
@@ -97,3 +99,5 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     main(args)
+
+    print("done!")
