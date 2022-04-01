@@ -86,11 +86,13 @@ def main(args):
     ############################################################################
     """ dataset """
 
-    train_set = make_dataset(config['dataset'], split='train')
+    train_set = make_dataset(
+        config['dataset'], split=config['splits']['train'],
+    )
     train_loader = DataLoader(
         train_set, 
         batch_size=config['opt']['batch_size'],
-        num_workers=16,
+        num_workers=config['opt']['n_workers'],
         collate_fn=collate_fn,
         shuffle=True, 
         pin_memory=True, 
@@ -99,21 +101,19 @@ def main(args):
     train_iterator = cycle(train_loader)
     print('train data size: {:d}'.format(len(train_set)))
 
-    try:
-        val_set = make_dataset(config['dataset'], split='val')
-        val_loader = DataLoader(
-            val_set, 
-            batch_size=config['opt']['batch_size'],
-            num_workers=16,
-            collate_fn=collate_fn,
-            shuffle=False, 
-            pin_memory=True, 
-            drop_last=True,
-        )
-        print('val data size: {:d}'.format(len(val_set)))
-    except:
-        val_loader = None
-        print('WARNING: validation set does not exist')
+    val_set = make_dataset(
+        config['dataset'], split=config['splits']['val']
+    )
+    val_loader = DataLoader(
+        val_set, 
+        batch_size=config['opt']['batch_size'],
+        num_workers=config['opt']['n_workers'],
+        collate_fn=collate_fn,
+        shuffle=False, 
+        pin_memory=True, 
+        drop_last=True,
+    )
+    print('val data size: {:d}'.format(len(val_set)))
 
     ############################################################################
     """ Training / Validation """

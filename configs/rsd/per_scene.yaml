@@ -1,21 +1,22 @@
 dataset:
-  path: ./data/real/objects_1211/num24/num24_2/meas/processed/1cm_768x32x32.mat
-  clip: 768
+  path: ./data/synthetic/test/1cm_600x256x256.hdr
+  clip: 512
+  size: 128
   scale: 1
   background: 0
-  color: g
+  color: rgb
 
 rsd:
-  t: 768
-  d: 32
-  h: 32
-  w: 32
-  in_plane: 1
+  t: 512
+  d: 128
+  h: 128
+  w: 128
+  in_plane: 3
   wall_size: 2
   bin_len: 0.01
-  zmin: 0.8
-  zmax: 1.8
-  scale_coef: 1
+  zmin: 0
+  zmax: 2
+  scale_coef: 2
   n_cycles: 4
   ratio: 0.1
   actv: linear

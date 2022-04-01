@@ -96,7 +96,7 @@ class RSDBase(nn.Module):
         self.register_buffer("coefs", coefs, persistent=False)
 
         # parameters associated with RSD propagation
-        frsd = torch.from_numpy(frsd.astype(np.complex64))      # (o, d, h*2, w*2)
+        frsd = torch.from_numpy(frsd.astype(np.complex64))      # (o, d, h(*2), w(*2))
         self.register_buffer("frsd", frsd, persistent=False)
         
         phase = torch.from_numpy(phase.astype(np.complex64))    # (o, d, h, w)
@@ -181,8 +181,17 @@ class RSD(RSDBase):
         fsrc = fft.fftn(phasor, s=[-1, -1])             # (bs*c, o, h*2, w*2)
 
         ## Step 3: RSD propagation
-        fdst = fsrc.unsqueeze(2) * self.frsd
-        fdst = self.phase * fdst                        # (bs*c, o, d, h*2, w*2)
+        # WARNING: PyTorch is buggy when distributing complex tensors
+        # here is a temporary workaround
+        frsd, phase = self.frsd, self.phase
+        if frsd.dim() == 5:
+            frsd = torch.complex(frsd[..., 0], frsd[..., 1])
+        if phase.dim() == 5:
+            phase = torch.complex(phase[..., 0], phase[..., 1])
+        fdst = fsrc.unsqueeze(2) * frsd
+        # fdst = fsrc.unsqueeze(2) * self.frsd
+        fdst = phase * fdst
+        # fdst = self.phase * fdst                        # (bs*c, o, d, h*2, w*2)
         fvol = torch.sum(fdst, 1)                       # (bs*c, d, h*2, w*2)
         tvol = fft.ifftn(fvol, s=[-1, -1])
         tvol = tvol[:, :, h//2:h + h//2, w//2:w + w//2] # (bs*c, d, h, w)
@@ -237,8 +246,17 @@ class RSDEfficient(RSDBase):
         fsrc = fft.fftn(phasor, s=[-1, -1])             # (bs*c, o, h, w)
 
         ## Step 3: RSD propagation
-        fdst = fsrc.unsqueeze(2) * self.frsd
-        fdst = self.phase * fdst                        # (bs*c, o, d, h, w)
+        # WARNING: PyTorch is buggy when distributing complex tensors
+        # here is a temporary workaround
+        frsd, phase = self.frsd, self.phase
+        if frsd.dim() == 5:
+            frsd = torch.complex(frsd[..., 0], frsd[..., 1])
+        if phase.dim() == 5:
+            phase = torch.complex(phase[..., 0], phase[..., 1])
+        fdst = fsrc.unsqueeze(2) * frsd
+        # fdst = fsrc.unsqueeze(2) * self.frsd
+        fdst = phase * fdst                             # (bs*c, o, d, h, w)
+        # fdst = self.phase * fdst                        # (bs*c, o, d, h, w)
         fvol = torch.sum(fdst, 1)                       # (bs*c, d, h, w)
         tvol = fft.ifftn(fvol, s=[-1, -1])
         tvol = fft.ifftshift(tvol, dim=(-2, -1))
@@ -274,7 +292,7 @@ class FRN(nn.Module):
         bias = True if norm == "none" or not affine else False
 
         # conv1 is initialized as a mean filter
-        conv1 = torch.zeros(1, 1, 3, 3, 3)
+        conv1 = torch.zeros(1, in_plane, 3, 3, 3)
         conv1[..., 1:, 1:, 1:] = 0.125
         self.conv1 = nn.Parameter(conv1)
 

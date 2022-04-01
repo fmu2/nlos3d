@@ -1,0 +1,86 @@
+dataset:
+  root: ./data/synthetic/bikes
+  scale: 1
+  ds: 1
+  clip: 512
+  size: 128
+  background: [0.05, 0.2]
+  target_size: 128
+  target_noise: 0.005
+  color: rgb
+
+splits:
+  train: train_128
+  val: val_unseen_poses_128
+
+model:
+  encoder:
+    type: frn
+
+    frn:
+      in_plane: 3
+      plane: 6
+
+      rsd:
+        t: 256
+        d: 64
+        h: 64
+        w: 64
+        in_plane: 6
+        wall_size: 2
+        bin_len: 0.02
+        zmin: 0
+        zmax: 2
+        scale_coef: 1
+
+    actv: leaky_relu
+    norm: none
+    affine: false
+
+  decoder:
+    transformer:
+      d: 64
+      h: 64
+      w: 64
+      wall_size: 2
+      zmin: -1
+      zmax: 1
+
+    renderer:
+      type: v0
+
+      v0:
+        in_plane: 6
+        out_plane: 3
+        actv: leaky_relu
+        norm: none
+        affine: false
+
+opt:
+  batch_size: 2
+  n_workers: 12
+  n_itrs: 50000
+
+  optim_type: adam
+  lr: 1.e-4
+  momentum: 0.9
+  weight_decay: 0.0
+  beta1: 0.9
+  beta2: 0.999
+
+  clip_grad_norm: 1.0
+
+  sched_type: step
+  milestones: [40000]
+  gamma: 0.1
+
+train:
+  n_views: 4
+  include_orthogonal: true
+  in_scale: 1
+
+eval:
+  n_views: 1
+  include_orthogonal: true
+  in_scale: 1
+  

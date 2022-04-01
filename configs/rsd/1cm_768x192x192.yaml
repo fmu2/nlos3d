@@ -1,12 +1,12 @@
 dataset:
   root: ./data/real/objects_1211
-  res: 1cm
-  split: 768x192x192
   clip: 768
-  scale: 1
+  size: 192
   background: 0
   target_size: 192
   color: g
+
+split: 1cm_768x192x192
 
 rsd:
   t: 768
@@ -22,3 +22,4 @@ rsd:
   ratio: 0.1
 
 batch_size: 1
+n_workers: 12
