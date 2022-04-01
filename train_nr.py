@@ -50,8 +50,8 @@ def main(args):
     n_itrs = config['opt']['n_itrs']
     if config.get('_resume'):
         ckpt_name = os.path.join(ckpt_path, 'last.pth')
+        check_file(ckpt_name)
         try:
-            check_file(ckpt_name)
             ckpt = torch.load(ckpt_name)
             
             worker = EncoderDecoderWorker(ckpt['config']['model'])

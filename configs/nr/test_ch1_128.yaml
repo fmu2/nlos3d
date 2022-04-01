@@ -1,0 +1,19 @@
+dataset:
+  root: ./data/synthetic/letters
+  scale: 1
+  ds: 1
+  clip: 512
+  size: 128
+  background: 0
+  target_size: 128
+  color: gray
+
+split: val_unseen_objs_128
+
+eval:
+  n_views: 1
+  include_orthogonal: true
+  in_scale: 1
+
+batch_size: 1
+n_workers: 12

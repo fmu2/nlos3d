@@ -100,7 +100,7 @@ def main(args):
 
         for i in range(len(pred)):
             im = Image.fromarray(pred[i])
-            im.save(os.path.join(save_path, '{:04d}.png').format(idx))
+            im.save(os.path.join(save_path, '{:04d}.png'.format(idx)))
             idx += 1
 
     print('RMSE: {:.3f}'.format(rmse_metric.item()))
