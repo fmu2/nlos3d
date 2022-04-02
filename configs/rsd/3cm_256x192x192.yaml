@@ -13,6 +13,7 @@ rsd:
   d: 64
   h: 192
   w: 192
+  in_plane: 1
   wall_size: 2
   bin_len: 0.03
   zmin: 0.5
