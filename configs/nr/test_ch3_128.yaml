@@ -13,7 +13,7 @@ split: val_unseen_objs_128
 eval:
   n_views: 1
   include_orthogonal: true
-  in_scale: 1
+  in_scale: null
 
 batch_size: 1
 n_workers: 12
