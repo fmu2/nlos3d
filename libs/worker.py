@@ -106,8 +106,8 @@ class EncoderDecoderWorker(WorkerBase):
         loss, output_dict, metric_dict = self.run(meas, target, cfg)
         return loss, output_dict, metric_dict
 
+    @torch.no_grad()
     def eval(self, meas, target, cfg):
         self.model.eval()
-        with torch.no_grad():
-            loss, output_dict, metric_dict = self.run(meas, target, cfg)
+        loss, output_dict, metric_dict = self.run(meas, target, cfg)
         return loss, output_dict, metric_dict

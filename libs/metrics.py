@@ -59,6 +59,9 @@ class SSIM(nn.Module):
 
     def forward(self, im1, im2):
         assert im1.shape == im2.shape, 'input shape mismatch'
+        if im1.size(1) == 1:
+            im1 = im1.expand(-1, self.n_channels, -1, -1)
+            im2 = im2.expand(-1, self.n_channels, -1, -1)
         assert im1.size(1) == self.n_channels, 'number of channels mismatch'
 
         mu1 = F.conv2d(im1, self.kernel, groups=self.n_channels)

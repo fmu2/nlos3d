@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.fft as fft
 
 
 def make_actv(actv):
@@ -428,3 +429,96 @@ class UNetBlock(nn.Module):
         if self.skip is not None:
             y = torch.cat([self.skip(x), y], dim=1)
         return y
+
+
+class FFC3d(nn.Module):
+
+    def __init__(
+        self,
+        in_plane,
+        plane,
+        actv='relu',
+        norm='batch',
+        affine=True,
+    ):
+        super(FFC3d, self).__init__()
+
+        self.conv = nn.Sequential(
+            nn.Conv3d(in_plane * 2, plane * 2, 1, bias=False),
+            make_norm3d(plane * 2, norm, affine),
+            make_actv(actv),
+        )
+
+    def forward(self, x):
+        # FFT
+        x = fft.fftn(x, s=[-1, -1, -1], norm='ortho')
+        x = fft.fftshift(x, dim=(-3, -2, -1))
+        x = torch.cat([x.real, x.imag], dim=1)
+        
+        # conv
+        x = self.conv(x)
+
+        # IFFT
+        x = torch.complex(*x.split(x.size(1) // 2, dim=1))
+        x = fft.ifftshift(x, dim=(-3, -2, -1))
+        x = fft.ifftn(x, s=[-1, -1, -1], norm='ortho')
+
+        return x
+
+
+class ResFFC3d(nn.Module):
+
+    def __init__(
+        self, 
+        plane,
+        expansion,
+        actv='relu',
+        norm='batch',
+        affine=True,
+    ):
+        super(ResFFC3D, self).__init__()
+
+        hid_plane = plane // expansion
+
+        self.conv1 = nn.Conv3d(plane, hid_plane, 1, bias=False)
+        self.ffc = FFC3D(hid_plane, hid_plane, actv, norm, affine)
+        self.conv2 = nn.Conv3d(hid_plane, plane, 1, bias=False)
+
+        self.bn1 = make_norm3d(hid_plane, norm, affine)
+        self.bn2 = make_norm3d(plane, norm, affine)
+
+        self.actv = make_actv(actv)
+
+    def forward(self, x):
+        dx = self.actv(self.bn1(self.conv1(x)))
+        dx = self.ffc(dx)
+        dx = self.bn2(self.conv2(dx))
+        x = self.actv(x + dx)
+        return x
+
+
+class ResBlockFFC3d(nn.Module):
+
+    def __init__(
+        self, 
+        plane,
+        expansion,
+        n_layers,
+        actv='relu',
+        norm='batch',
+        affine=True,
+    ):
+        super(ResBlockFFC3d, self).__init__()
+
+        layers = []
+        for i in range(n_layers):
+            layers.append(
+                ResFFC3d(plane, expansion, actv, norm, affine)
+            )
+        self.layers = nn.Sequential(*layers)
+
+        self.out_plane = plane
+
+    def forward(self, x):
+        x = self.layers(x)
+        return x

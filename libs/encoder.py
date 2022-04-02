@@ -271,6 +271,51 @@ class RSDEfficient(RSDBase):
         return x
 
 
+class FCCNet(nn.Module):
+
+    def __init__(
+        self, 
+        t=512,
+        in_plane=1,         # number of input planes
+        plane=256,          # number of planes prior to propagation
+        expansion=4,        # expansion factor for bottleneck
+        n_layers=8,         # number of FFC blocks
+        actv="relu",        # activation function
+        norm="batch",       # normalization function
+        affine=True,        # if True, apply learnable affine transform in norm
+        **kwargs,
+    ):
+        super(FFCNet, self).__init__()
+        assert t % 2 == 0
+
+        self.in_ffc = FFC3d(
+            in_plane=in_plane * (t // 2 + 1), 
+            plane=plane, 
+            actv=actv, 
+            norm=norm, 
+            affine=affine,
+        )
+
+        self.blocks = ResBlockFFC3d(
+            plane=plane, 
+            expansion=expansion, 
+            n_layers=n_layers, 
+            actv=actv, 
+            norm=norm, 
+            affine=affine,
+        )
+
+        self.out_conv = nn.Conv3d(plane, plane, 3, 1, 1)
+
+    def forward(self, x):
+        x = fft.rfft(x, dim=1)          # (bs, c, o, h, w)
+        x = x.flatten(1, 2)             # (bs, c * o, h, w)
+        x = self.blocks(self.in_ffc(x))
+        x = torch.abs(x)
+        x = self.out_conv(x)
+        return x
+
+
 class FRN(nn.Module):
     """
     Feature extraction and propagation network

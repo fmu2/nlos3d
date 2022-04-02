@@ -3,26 +3,16 @@ import yaml
 
 RSD_DEFAULTS = {
   "dataset": {
-    "root": "./data/alphanumeric-simple",
-    "clip": 200,
+    "ds": 1,
     "scale": 1,
     "background": 0,
-    "target_size": 64,
+    "target_noise": 0,
   },
 
   "rsd": {
-    "t": 200,
-    "d": 32,
-    "h": 64,
-    "w": 64,
-    "in_plane": 1,
-
     "wall_size": 2,
-    "bin_len": 0.03,
-    "zmin": 0.8,
-    "zmax": 1.8,
-
-    "scale_coef": 1,
+    "zmin": 0,
+    "zmax": 2,
     "n_cycles": 4,
     "ratio": 0.1,
 
@@ -31,150 +21,76 @@ RSD_DEFAULTS = {
     "affine": False,
   },
 
-  "sqrt": True,
-
-  "main": {
-    "batch_size": 2,
-    "n_workers": 6,
-  },
+  "batch_size": 1,
 }
 
 
 RSD_PER_SCENE_DEFAULTS = {
   "dataset": {
-    "path": "./data/per_scene/num2/trial_1/1_frame.mat",
-    "format": "mat",
+    "ds": 1,
     "scale": 1,
-    "clip": 200,
-  },
-
-  "add_noise": True,
-  "noise": {
-    "path": "./data/per_scene/noise/noise.mat",
-    "format": "mat",
-    "scale": 1,
-    "clip": 200,
+    "background": 0,
   },
 
   "rsd": {
-    "t": 200,
-    "d": 32,
-    "h": 64,
-    "w": 64,
-    "in_plane": 1,
-
     "wall_size": 2,
-    "bin_len": 0.03,
-    "zmin": 0.8,
-    "zmax": 1.8,
-
-    "scale_coef": 2,
+    "zmin": 0,
+    "zmax": 2,
     "n_cycles": 4,
     "ratio": 0.1,
 
     "actv": "linear",
-    "norm": "max",
+    "norm": "none",
     "affine": False,
   },
-
-  "sqrt": False,
 }
 
 
 TRAIN_NR_DEFAULTS = {
-  "ckpt_name": "bike_nr",
-  "save_freq": 10,    # save every X epochs
-  "train_freq": 100,  # print every Y iterations
-  "val_freq": 10,
-
   "dataset": {
-    "root": "./data/bike",
-    "clip": 200,
+    "ds": 1,
     "scale": 1,
-    "background": [0.2, 0.5],
-    "target_size": 256,
-    "target_noise": 0.005,
-    "color": "rgb",
+    "background": 0,
+    "target_noise": 0,
   },
 
   "model": {
-    "encoder": {
-      "type": "densenet",
-
-      "densenet": {
-        "in_plane": 3,
-        "plane": 64,
-        "n_blocks": 3,
-        "n_layers": 4,
-        "layer_type": "v3",
-        "growth_rate": 16,
-        "bn": [True, True, False],
-        "ds": [True, True, False],
-        "actv": "leaky_relu",
-        "norm": "instance",
-        "affine": True,
-      }
-    },
-    
     "decoder": {
       "transformer": {
-        "d": 64,
-        "h": 64,
-        "w": 64,
         "wall_size": 2,
-        "zmin": -1,   # NOTE: wall is z=-1
+        "zmin": -1,
         "zmax": 1,
       },
-
-      "projector": {
-        "mode": "max",
-        "use_idx": False,
-      },
-      
-      "renderer": {
-        "type": "v2",
-
-        "v2": {
-          "in_plane": 256,
-          "out_plane": 3,
-          "n_levels": 2,
-          "min_plane": 8,
-          "actv": "leaky_relu",
-          "out_actv": "linear",
-          "norm": "norm",
-          "affine": False,
-        },
-      },
     },
   },
 
-  "optim": {
-    "optimizer": {
-      "type": "adam",
-      "lr": 1e-4,
-      "momentum": 0.9,
-      "weight_decay": 0,
-      "beta1": 0.9,
-      "beta2": 0.999,
-    },
-    
-    "scheduler": {
-      "type": "exp",
-      "milestone": [0.8],
-      "gamma": 0.1,
-      "decay_steps": 250000,
-    },
-  },
-
-  "main": {
-    "n_epochs": 100,
+  "opt": {
     "batch_size": 4,
-    "n_workers": 6,
+    "n_itrs": 50000,
 
-    "in_scale": 1,
+    "optim_type": "adam",
+    "lr": 1e-4,
+    "weight_decay": 0,
+    "beta1": 0.9,
+    "beta2": 0.999,
 
+    "clip_grad_norm": 1,
+
+    "sched_type": "step",
+    "milestones": [40000],
+    "gamma": 0.1,
+  },
+
+  "train": {
     "n_views": 4,
     "include_orthogonal": True,
+    "in_scale": 1,
+  },
+
+  "eval": {
+    "n_views": 1,
+    "include_orthogonal": True,
+    "in_scale": 1,
   },
 }
 

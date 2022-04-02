@@ -26,12 +26,12 @@ def main(args):
     try:
         config_path = os.path.join(ckpt_path, 'config.yaml')
         check_file(config_path)
-        config = load_config(config_path)
+        config = load_config(config_path, mode='train_nr')
         print('config loaded from checkpoint folder')
         config['_resume'] = True
     except:
         check_file(args.config)
-        config = load_config(args.config)
+        config = load_config(args.config, mode='train_nr')
         print('config loaded from command line')
 
     # configure GPUs

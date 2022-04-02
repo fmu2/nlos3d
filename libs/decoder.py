@@ -103,7 +103,7 @@ class RendererV0(nn.Module):
         norm="none",
         affine=False,
     ):
-        super(Renderer, self).__init__()
+        super(RendererV0, self).__init__()
 
         self.conv1 = nn.Sequential(
             nn.Conv2d(in_plane, in_plane, 3, 1, 1),

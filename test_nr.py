@@ -8,6 +8,7 @@ from PIL import Image
 import torch
 from torch.utils.data import DataLoader
 
+from libs.config import load_config
 from libs.data import collate_fn, make_dataset
 from libs.worker import EncoderDecoderWorker
 from libs.utils import *
@@ -17,6 +18,10 @@ def main(args):
     # fetch checkpoint folder
     ckpt_path = os.path.join('ckpt', args.ckpt)
     check_path(ckpt_path)
+
+    # load config
+    check_file(args.config)
+    config = load_config(args.config, mode='test_nr')
 
     # configure GPUs
     set_gpu(args.gpu)
@@ -78,10 +83,10 @@ def main(args):
         for k in metric_dict.keys():
             metrics[k].update(metric_dict[k].item())
 
-        pred = output_dict['pred'].numpy()
-        target = output_dict['target'].numpy()
-        pred = pred.transpose(0, 2, 3, 1)
-        target = target.transpose(0, 2, 3, 1)
+        pred = output_dict['pred'].numpy()          # (bs, 1/3, h, w)
+        target = output_dict['target'].numpy()      # (bs, 1/3, h, w)
+        pred = pred.transpose(0, 2, 3, 1)           # (bs, h, w, 1/3)
+        target = target.transpose(0, 2, 3, 1)       # (bs, h, w, 1/3)
         
         imgs = np.concatenate([target, pred], axis=2)
         imgs = (imgs * 255).astype(np.uint8)
