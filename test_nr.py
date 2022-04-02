@@ -37,9 +37,9 @@ def main(args):
     """ worker """
 
     ckpt_name = os.path.join(ckpt_path, 'last.pth')
-    check_file(ckpt_name)
 
     try:
+        check_file(ckpt_name)
         ckpt = torch.load(ckpt_name)
         worker = EncoderDecoderWorker(ckpt['config']['model'])
         worker.load(ckpt)

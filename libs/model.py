@@ -56,10 +56,8 @@ def load_encoder_decoder_model(ckpt):
 
 def normalize_meas(x):
     bs, c, d, h, w = x.shape
-    x = x.reshape(bs, c, -1)
-    x_max = x.max(-1, keepdim=True)[0]
-    x = x / x_max
-    x = x.reshape(bs, c, d, h, w)
+    x_max = x.amax(dim=(-3, -2, -1), keepdim=True)
+    x = x / (x_max + 1e-5)
     return x
 
 

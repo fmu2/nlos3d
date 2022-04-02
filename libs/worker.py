@@ -86,6 +86,7 @@ class EncoderDecoderWorker(WorkerBase):
         loss = F.mse_loss(pred, target, reduction='mean')
 
         pred = torch.clamp(pred.detach(), 0, 1)
+        target = torch.clamp(target, 0, 1)
         pred = pred.flatten(0, 1)
         target = target.flatten(0, 1)
         
