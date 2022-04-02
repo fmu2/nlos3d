@@ -31,7 +31,7 @@ model:
         bin_len: 0.02
         zmin: 0
         zmax: 2
-        scale_coef: 1
+        scale_coef: 2
 
     actv: leaky_relu
     norm: none
@@ -71,7 +71,7 @@ opt:
   clip_grad_norm: 1.0
 
   sched_type: step
-  milestones: [40000]
+  milestones: [50000]
   gamma: 0.1
 
 train:

@@ -57,7 +57,7 @@ model:
         affine: false
 
 opt:
-  batch_size: 2
+  batch_size: 4
   n_workers: 12
   n_itrs: 50000
 
@@ -71,7 +71,7 @@ opt:
   clip_grad_norm: 1.0
 
   sched_type: step
-  milestones: [40000]
+  milestones: [50000]
   gamma: 0.1
 
 train:
