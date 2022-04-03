@@ -137,7 +137,7 @@ def main(args):
         train_loss.update(loss.item())
         writer.add_scalars('loss', {'train': train_loss.item()}, itr)
 
-        for k in metric_dict.keys():
+        for k in metric_list:
             train_metrics[k].update(metric_dict[k].item())
             writer.add_scalars(k, {'train': train_metrics[k].item()}, itr)
 
@@ -161,7 +161,7 @@ def main(args):
                 itr // args.print_freq, n_itrs // args.print_freq
             )
             log_str += 'loss {:.3f} | '.format(train_loss.item())
-            for k in metric_dict.keys():
+            for k in metric_list:
                 log_str += '{:s} {:.2f} | '.format(k, train_metrics[k].item())
             log_str += t_elapsed
             log(log_str, 'log.txt')
@@ -191,8 +191,8 @@ def main(args):
             timer.start()
 
         # val
-        if val_loader is not None and itr % args.val_freq == 0:
-            for i, (meas, target, _) in enumerate(val_loader):
+        if itr % args.val_freq == 0:
+            for i, (meas, target, _) in enumerate(val_loader, 1):
                 loss, output_dict, metric_dict = worker.eval(
                     meas=meas,
                     target=target,
@@ -234,6 +234,14 @@ def main(args):
             val_loss.reset()
             for k in metric_list:
                 val_metrics[k].reset()
+
+            ckpt = worker.save()
+            ckpt['itr'] = itr
+            ckpt['config'] = config
+            ckpt['optimizer'] = optimizer.state_dict()
+            ckpt['scheduler'] = scheduler.state_dict()
+            torch.save(ckpt, os.path.join(ckpt_path, '{:d}.pth'.format(n_itrs)))
+            
             timer.start()
 
 ################################################################################
@@ -245,7 +253,7 @@ if __name__ == '__main__':
                         help='GPU device IDs')
     parser.add_argument('-pf', '--print_freq', type=int, default=1, 
                         help='print frequency (x100 itrs)')
-    parser.add_argument('-vf', '--val_freq', type=int, default=100,
+    parser.add_argument('-vf', '--val_freq', type=int, default=50,
                         help='validation frequency (x100 itrs)')
     args = parser.parse_args()
 
