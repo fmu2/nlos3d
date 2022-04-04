@@ -834,6 +834,41 @@ TEST_DEFAULTS = {
   },
 }
 
+TEST_NR_DEFAULTS = {
+  "dataset": {
+    "scale": 1,
+    "ds": 1,
+    "background": 0,
+    "target_noise": 0,
+  },
+
+  "eval": {
+    "n_views": 1,
+    "include_orthogonal": true,
+    "in_scale": 1,
+  },
+}
+
+TEST_SUP_DEFAULTS = {
+  "dataset": {
+    "scale": 1,
+    "ds": 1,
+    "background": 0,
+    "target_noise": 0,
+  },
+
+  "eval": {
+    "n_views": 1,
+    "include_orthogonal": True,
+    "chunk_size": 4096,
+
+    "in_scale": 1,
+    "s_scale": 1,
+    "sigma_noise": 0,
+    "color_noise": 0,
+  },
+}
+
 TEST_PER_SCENE_DEFAULTS = {
   "ckpt": "last.pth",
 
@@ -890,6 +925,10 @@ def load_default_config(mode="train"):
     config = TRAIN_UNSUP_PER_SCENE_DEFAULTS
   elif mode == "test":
     config = TEST_DEFAULTS
+  elif mode == "test_nr":
+    config = TEST_NR_DEFAULTS
+  elif mode == "test_sup":
+    config = TEST_SUP_DEFAULTS
   elif mode == "test_per_scene":
     config = TEST_PER_SCENE_DEFAULTS
   elif mode == "rsd":
@@ -918,6 +957,10 @@ def load_config(config_file, mode="train"):
     defaults = TRAIN_UNSUP_PER_SCENE_DEFAULTS
   elif mode == "test":
     defaults = TEST_DEFAULTS
+  elif mode == "test_nr":
+    defaults = TEST_NR_DEFAULTS
+  elif mode == "test_sup":
+    defaults = TEST_SUP_DEFAULTS
   elif mode == "test_per_scene":
     defaults = TEST_PER_SCENE_DEFAULTS
   elif mode == "rsd":
