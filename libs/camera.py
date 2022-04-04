@@ -547,6 +547,8 @@ class Wall:
         self.u = uv_size ** 2                     # number of cells in the UV-grid
 
         self.foreshortening = foreshortening
+
+        assert depth > 0
         self.near = 1 - depth                     # z-coordinate of near plane
 
         # pixel xyz-coordinates in world frame

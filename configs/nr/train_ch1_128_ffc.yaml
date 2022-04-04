@@ -15,27 +15,23 @@ splits:
 
 model:
   encoder:
-    type: frn
+    type: ffc
 
-    frn:
+    ffc:
+      t: 512
+      d: 64
+      h: 128
+      w: 128
       in_plane: 1
-      plane: 3
-
-      rsd:
-        t: 256
-        d: 64
-        h: 64
-        w: 64
-        in_plane: 3
-        wall_size: 2
-        bin_len: 0.02
-        zmin: 0
-        zmax: 2
-        scale_coef: 1
-
-    actv: leaky_relu
-    norm: none
-    affine: false
+      plane: 256
+      out_plane: 4
+      n_layers: 5
+      bottleneck: true
+      expansion: 4
+      actv: relu
+      norm: batch
+      affine: true
+      pe: false
 
   decoder:
     transformer:
@@ -47,11 +43,12 @@ model:
       zmax: 1
 
     renderer:
-      type: v0
+      type: v2
 
-      v0:
-        in_plane: 3
+      v2:
+        in_plane: 4
         out_plane: 1
+        min_plane: 2
         actv: leaky_relu
         norm: none
         affine: false
@@ -77,9 +74,9 @@ opt:
 train:
   n_views: 4
   include_orthogonal: true
-  in_scale: null
+  in_scale: 1
 
 eval:
   n_views: 1
   include_orthogonal: true
-  in_scale: null
+  in_scale: 1

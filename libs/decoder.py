@@ -105,22 +105,31 @@ class RendererV0(nn.Module):
     ):
         super(RendererV0, self).__init__()
 
+        assert in_plane > out_plane
+        self.out_plane = out_plane
+
         self.conv1 = nn.Sequential(
             nn.Conv2d(in_plane, in_plane, 3, 1, 1),
             ResBlock2d(in_plane, in_plane, 1, 2, actv, norm, affine),
         )
         self.conv2 = nn.Sequential(
-            nn.Conv2d(in_plane + 1, in_plane * 2, 3, 1, 1),
+            nn.Conv2d(in_plane + out_plane, in_plane * 2, 3, 1, 1),
             ResBlock2d(in_plane * 2, in_plane * 2, 1, 2, actv, norm, affine),
         )
         self.out_conv = nn.Conv2d(in_plane * 2, out_plane, 3, 1, 1)
 
     def forward(self, x):
         x0 = F.interpolate(
-            x[:, :1], scale_factor=2, mode="bilinear", align_corners=False
+            x[:, :self.out_plane], 
+            scale_factor=2, 
+            mode="bilinear", 
+            align_corners=False,
         )
         x = F.interpolate(
-            self.conv1(x), scale_factor=2, mode="bilinear", align_corners=False
+            self.conv1(x), 
+            scale_factor=2, 
+            mode="bilinear", 
+            align_corners=False,
         )
         x = self.conv2(torch.cat([x0, x], dim=1))
         x = x0 + self.out_conv(x)

@@ -431,6 +431,57 @@ class UNetBlock(nn.Module):
         return y
 
 
+class FFC2d(nn.Module):
+
+    def __init__(
+        self,
+        in_plane,
+        plane,
+        actv='relu',
+        norm='batch',
+        affine=True,
+        pe=False,
+    ):
+        super(FFC2d, self).__init__()
+
+        in_dim = in_plane * 2
+        if pe:
+            in_dim += 2
+
+        self.conv = nn.Sequential(
+            nn.Conv2d(in_dim, plane * 2, 1, bias=False),
+            make_norm2d(norm, plane * 2, affine),
+            make_actv(actv),
+        )
+
+        self.pe = pe
+
+    def forward(self, x):
+        # FFT
+        x = fft.fftn(x, s=[-1, -1], norm='ortho')
+        x = fft.fftshift(x, dim=(-2, -1))
+        x = torch.cat([x.real, x.imag], dim=1)
+        
+        # position encoding
+        if self.pe:
+            bs, _, h, w = x.size()
+            h_tics = torch.linspace(-1, 1, h, device=x.device)
+            w_tics = torch.linspace(-1, 1, w, device=x.device)
+            pe = torch.stack(torch.meshgrid(h_tics, w_tics, indexing='ij'))
+            pe = pe.expand(bs, -1, -1, -1)
+            x = torch.cat([x, pe], dim=1)
+
+        # conv
+        x = self.conv(x)
+
+        # IFFT
+        x = torch.complex(*x.split(x.size(1) // 2, dim=1))
+        x = fft.ifftshift(x, dim=(-2, -1))
+        x = fft.ifftn(x, s=[-1, -1], norm='ortho')
+
+        return x
+
+
 class FFC3d(nn.Module):
 
     def __init__(
@@ -440,20 +491,39 @@ class FFC3d(nn.Module):
         actv='relu',
         norm='batch',
         affine=True,
+        pe=False,
     ):
         super(FFC3d, self).__init__()
 
+        in_dim = in_plane * 2
+        if pe:
+            in_dim += 3
+
         self.conv = nn.Sequential(
-            nn.Conv3d(in_plane * 2, plane * 2, 1, bias=False),
-            make_norm3d(plane * 2, norm, affine),
+            nn.Conv3d(in_dim, plane * 2, 1, bias=False),
+            make_norm3d(norm, plane * 2, affine),
             make_actv(actv),
         )
+
+        self.pe = pe
 
     def forward(self, x):
         # FFT
         x = fft.fftn(x, s=[-1, -1, -1], norm='ortho')
         x = fft.fftshift(x, dim=(-3, -2, -1))
         x = torch.cat([x.real, x.imag], dim=1)
+
+        # position encoding
+        if self.pe:
+            bs, _, t, h, w = x.size()
+            t_tics = torch.linspace(-1, 1, t, device=x.device)
+            h_tics = torch.linspace(-1, 1, h, device=x.device)
+            w_tics = torch.linspace(-1, 1, w, device=x.device)
+            pe = torch.stack(
+                torch.meshgrid(t_tics, h_tics, w_tics, indexing='ij')
+            )
+            pe = pe.expand(bs, -1, -1, -1, -1)
+            x = torch.cat([x, pe], dim=1)
         
         # conv
         x = self.conv(x)
@@ -466,34 +536,134 @@ class FFC3d(nn.Module):
         return x
 
 
+class ResFFC2d(nn.Module):
+
+    def __init__(
+        self, 
+        plane,
+        bottleneck=True,
+        expansion=4,
+        actv='relu',
+        norm='batch',
+        affine=True,
+        pe=False,
+    ):
+        super(ResFFC2d, self).__init__()
+
+        hid_plane = plane // expansion if bottleneck else plane
+
+        self.ffc = FFC2d(hid_plane, hid_plane, actv, norm, affine, pe)
+
+        self.bottleneck = bottleneck
+        if bottleneck:
+            self.conv1 = nn.Conv2d(plane * 2, hid_plane * 2, 1, bias=False)
+            self.conv2 = nn.Conv2d(hid_plane * 2, plane * 2, 1, bias=False)
+            self.bn1 = make_norm2d(norm, hid_plane * 2, affine)
+            self.bn2 = make_norm2d(norm, plane * 2, affine)
+            self.actv = make_actv(actv)
+
+    def forward(self, x):
+        if self.bottleneck:
+            x = torch.cat([x.real, x.imag], dim=1)
+            dx = self.actv(self.bn1(self.conv1(x)))
+            dx = torch.complex(*dx.split(dx.size(1) // 2, dim=1))
+        else:
+            dx = x
+
+        dx = self.ffc(dx)
+
+        if self.bottleneck:
+            dx = torch.cat([dx.real, dx.imag], dim=1)
+            dx = self.bn2(self.conv2(dx))
+            x = self.actv(x + dx)
+            x = torch.complex(*x.split(x.size(1) // 2, dim=1))
+        else:
+            x = x + dx
+        
+        return x
+
+
 class ResFFC3d(nn.Module):
 
     def __init__(
         self, 
         plane,
-        expansion,
+        bottleneck=True,
+        expansion=4,
         actv='relu',
         norm='batch',
         affine=True,
+        pe=False,
     ):
-        super(ResFFC3D, self).__init__()
+        super(ResFFC3d, self).__init__()
 
-        hid_plane = plane // expansion
+        hid_plane = plane // expansion if bottleneck else plane
 
-        self.conv1 = nn.Conv3d(plane, hid_plane, 1, bias=False)
-        self.ffc = FFC3D(hid_plane, hid_plane, actv, norm, affine)
-        self.conv2 = nn.Conv3d(hid_plane, plane, 1, bias=False)
+        self.ffc = FFC3d(hid_plane, hid_plane, actv, norm, affine, pe)
 
-        self.bn1 = make_norm3d(hid_plane, norm, affine)
-        self.bn2 = make_norm3d(plane, norm, affine)
-
-        self.actv = make_actv(actv)
+        self.bottleneck = bottleneck
+        if bottleneck:
+            self.conv1 = nn.Conv3d(plane, hid_plane, 1, bias=False)
+            self.conv2 = nn.Conv3d(hid_plane, plane, 1, bias=False)
+            self.bn1 = make_norm3d(norm, hid_plane, affine)
+            self.bn2 = make_norm3d(norm, plane, affine)
+            self.actv = make_actv(actv)
 
     def forward(self, x):
-        dx = self.actv(self.bn1(self.conv1(x)))
+        if self.bottleneck:
+            x = torch.cat([x.real, x.imag], dim=1)
+            dx = self.actv(self.bn1(self.conv1(x)))
+            dx = torch.complex(*dx.split(dx.size(1) // 2, dim=1))
+        else:
+            dx = x
+
         dx = self.ffc(dx)
-        dx = self.bn2(self.conv2(dx))
-        x = self.actv(x + dx)
+        
+        if self.bottleneck:
+            dx = torch.cat([dx.real, dx.imag], dim=1)
+            dx = self.bn2(self.conv2(dx))
+            x = self.actv(x + dx)
+            x = torch.complex(*x.split(x.size(1) // 2, dim=1))
+        else:
+            x = x + dx
+
+        return x
+
+
+class ResBlockFFC2d(nn.Module):
+
+    def __init__(
+        self, 
+        plane,
+        n_layers,
+        bottleneck=True,
+        expansion=4,
+        actv='relu',
+        norm='batch',
+        affine=True,
+        pe=False,
+    ):
+        super(ResBlockFFC2d, self).__init__()
+
+        layers = []
+        for i in range(n_layers):
+            layers.append(
+                ResFFC2d(
+                    plane=plane, 
+                    bottleneck=bottleneck, 
+                    expansion=expansion, 
+                    actv=actv, 
+                    norm=norm, 
+                    affine=affine, 
+                    pe=pe,
+                )
+            )
+        self.layers = nn.Sequential(*layers)
+
+        self.out_plane = plane
+
+    def forward(self, x):
+        x = self.layers(x)
         return x
 
 
@@ -502,18 +672,28 @@ class ResBlockFFC3d(nn.Module):
     def __init__(
         self, 
         plane,
-        expansion,
         n_layers,
+        bottleneck=True,
+        expansion=4,
         actv='relu',
         norm='batch',
         affine=True,
+        pe=False,
     ):
         super(ResBlockFFC3d, self).__init__()
 
         layers = []
         for i in range(n_layers):
             layers.append(
-                ResFFC3d(plane, expansion, actv, norm, affine)
+                ResFFC3d(
+                    plane=plane,
+                    bottleneck=bottleneck, 
+                    expansion=expansion, 
+                    actv=actv, 
+                    norm=norm, 
+                    affine=affine, 
+                    pe=pe,
+                )
             )
         self.layers = nn.Sequential(*layers)
 

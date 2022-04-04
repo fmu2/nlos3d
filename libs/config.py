@@ -584,17 +584,11 @@ TRAIN_DEFAULTS = {
 
 
 TRAIN_UNSUP_DEFAULTS = {
-  "ckpt_name": "alphanumeric",
-  "save_freq": 10,    # save every X epochs
-  "train_freq": 100,  # print every Y iterations
-  "val_freq": 10,
-  "diagnose": False,
-
   "dataset": {
-    "root": "./data/alphanumeric",
+    "ds": 1,
     "scale": 1,
-    "clip": 200,
-    "background": [0.1, 0.5],
+    "background": 0,
+    "target_noise": 0,
   },
 
   "camera": {   # NOTE: z-axis points into the camera
@@ -602,38 +596,15 @@ TRAIN_UNSUP_DEFAULTS = {
     
     "orthographic": {
       "size": 2,
-      "res": 256,
     },
   },
 
   "wall": {
     "size": 2,
-    "res": 64,
-    "block_size": 32,
-    "uv_size": 64,
     "foreshortening": False,
-    "depth": 0.8,
   },
 
   "model": {
-    "encoder": {
-      "type": "densenet",
-
-      "densenet": {
-        "in_plane": 3,
-        "plane": 64,
-        "n_blocks": 3,
-        "n_layers": 4,
-        "layer_type": "v3",
-        "growth_rate": 16,
-        "bn": [True, True, False],
-        "ds": [True, True, False],
-        "actv": "leaky_relu",
-        "norm": "instance",
-        "affine": True,
-      }
-    },
-    
     "renderer": {
       "embedder": {
         "embed_p": True,
@@ -665,24 +636,9 @@ TRAIN_UNSUP_DEFAULTS = {
         },
       },
       
-      "field": {
-        "type": "nerf",
-
-        "nerf": {
-          "hid_dim": 32,
-          "skips": [],
-          "n_sigma_layers": 1,
-          "n_color_layers": 1,
-          "actv": "relu",
-          "film_hid_dim": 16,
-          "film_n_layers": 2,
-          "film_actv": "leaky_relu",
-        },
-      },
-
       "common": {
-        "bb_ctr": [0, 0, 0.3],
-        "bb_size": [2, 2, 1],
+        "bb_ctr": [0, 0, 0],
+        "bb_size": [2, 2, 2],
         "inf": 10,
         "p_polar": False,
         "d_polar": True,
@@ -693,83 +649,55 @@ TRAIN_UNSUP_DEFAULTS = {
 
       "transient": {
         "light": [0, 0, -1],
-        "bin_range": [50, 150],
-        "bin_len": 0.03,
-      },
-
-      "steady_state": {
-        "bin_len": 0.03,
-        "n_bins": 48,
       },
     },
   },
 
-  "loss": {
-    "pm": 1,
-    "bp": 1e-4,
-    "tva": 1e-5, 
+  "opt": {
+    "batch_size": 4,
+    "n_itrs": 50000,
+
+    "optim_type": "adam",
+    "lr": 1e-2,
+    "weight_decay": 0,
+    "beta1": 0.9,
+    "beta2": 0.999,
+
+    "clip_grad_norm": 1,
+
+    "sched_type": "step",
+    "milestones": [40000],
+    "gamma": 0.1,
+
+    "poisson": 1.0,
+    "beta": 0.0,
+    "tv": 0.0,
   },
 
-  "optim": {
-    "optimizer": {
-      "type": "adam",
-      "lr": 1e-4,
-      "momentum": 0.9,
-      "weight_decay": 0,
-      "beta1": 0.9,
-      "beta2": 0.999,
-    },
-    
-    "scheduler": {
-      "type": "exp",
-      "milestone": [0.8],
-      "gamma": 0.1,
-      "decay_steps": 25000,
-    },
+  "train": {
+    "in_scale": 1,
+    "sigma_noise": 0,
+    "color_noise": 0,
   },
 
-  "main": {
-    "n_epochs": 25,
-    "batch_size": 2,
-    "n_workers": 6,
-
-    "n_views": 4,
+  "eval": {
+    "n_views": 1,
     "include_orthogonal": True,
+    "chunk_size": 4096,
 
-    "train": {
-      "in_scale": None,
-      "n_steps": 2,
-      "t_scale": 25465,
-      "s_scale": 1,
-      "sigma_noise": 1,
-      "color_noise": 0,
-    },
-
-    "val": {
-      "in_scale": None,
-      "n_steps": 2,
-      "t_scale": 25465,
-      "s_scale": 1,
-      "sigma_noise": 0,
-      "color_noise": 0,
-    },
+    "in_scale": 1,
+    "sigma_noise": 0,
+    "color_noise": 0,
   },
 }
 
 
 TRAIN_SUP_DEFAULTS = {
-  "ckpt_name": "alphanumeric",
-  "save_freq": 10,    # save every X epochs
-  "train_freq": 100,  # print every Y iterations
-  "val_freq": 10,
-  "diagnose": False,
-
   "dataset": {
-    "root": "./data/alphanumeric",
+    "ds": 1,
     "scale": 1,
-    "clip": 200,
-    "background": [0.1, 0.5],
-    "target_size": 256,
+    "background": 0,
+    "target_noise": 0,
   },
 
   "camera": {   # NOTE: z-axis points into the camera
@@ -777,30 +705,10 @@ TRAIN_SUP_DEFAULTS = {
     
     "orthographic": {
       "size": 2,
-      "res": 256,
-      "block_size": 4,
     },
   },
 
   "model": {
-    "encoder": {
-      "type": "densenet",
-
-      "densenet": {
-        "in_plane": 3,
-        "plane": 64,
-        "n_blocks": 3,
-        "n_layers": 4,
-        "layer_type": "v3",
-        "growth_rate": 16,
-        "bn": [True, True, False],
-        "ds": [True, True, False],
-        "actv": "leaky_relu",
-        "norm": "instance",
-        "affine": True,
-      }
-    },
-    
     "renderer": {
       "embedder": {
         "embed_p": True,
@@ -824,7 +732,7 @@ TRAIN_SUP_DEFAULTS = {
         },
         
         "z": {
-          "in_dim": 16,
+          "in_dim": 6,
           "include_input": True,
           "n_freqs": 6,
           "log_sampling": True,
@@ -832,24 +740,9 @@ TRAIN_SUP_DEFAULTS = {
         },
       },
       
-      "field": {
-        "type": "nerf",
-
-        "nerf": {
-          "hid_dim": 32,
-          "skips": [],
-          "n_sigma_layers": 1,
-          "n_color_layers": 1,
-          "actv": "relu",
-          "film_hid_dim": 16,
-          "film_n_layers": 2,
-          "film_actv": "leaky_relu",
-        },
-      },
-
       "common": {
-        "bb_ctr": [0, 0, 0.3],
-        "bb_size": [2, 2, 1],
+        "bb_ctr": [0, 0, 0],
+        "bb_size": [2, 2, 2],
         "inf": 10,
         "p_polar": False,
         "d_polar": True,
@@ -857,62 +750,49 @@ TRAIN_SUP_DEFAULTS = {
         "sigma_transform": "relu",
         "color_transform": "relu",
       },
-
-      "steady_state": {
-        "bin_len": 0.03,
-        "n_bins": 48,
-      },
     },
   },
 
-  "loss": {
-    "mb": 1,
-    "md": 0,
-    "bp": 1e-4,
-    "tva": 1e-5, 
+  "opt": {
+    "batch_size": 4,
+    "n_itrs": 50000,
+
+    "optim_type": "adam",
+    "lr": 1e-2,
+    "weight_decay": 0,
+    "beta1": 0.9,
+    "beta2": 0.999,
+
+    "clip_grad_norm": 1,
+
+    "sched_type": "step",
+    "milestones": [40000],
+    "gamma": 0.1,
+
+    "mse": 1.0,
+    "beta": 0.0,
+    "tv": 0.0,
   },
 
-  "optim": {
-    "optimizer": {
-      "type": "adam",
-      "lr": 1e-4,
-      "momentum": 0.9,
-      "weight_decay": 0,
-      "beta1": 0.9,
-      "beta2": 0.999,
-    },
-    
-    "scheduler": {
-      "type": "exp",
-      "milestone": [0.8],
-      "gamma": 0.1,
-      "decay_steps": 25000,
-    },
-  },
-
-  "main": {
-    "n_epochs": 25,
-    "batch_size": 2,
-    "n_workers": 6,
-
+  "train": {
     "n_views": 4,
     "include_orthogonal": True,
 
-    "train": {
-      "in_scale": 1,
-      "n_steps": 3,
-      "s_scale": 1,
-      "sigma_noise": 1,
-      "color_noise": 0,
-    },
+    "in_scale": 1,
+    "s_scale": 1,
+    "sigma_noise": 0,
+    "color_noise": 0,
+  },
 
-    "val": {
-      "in_scale": 1,
-      "n_steps": 3,
-      "s_scale": 1,
-      "sigma_noise": 0,
-      "color_noise": 0,
-    },
+  "eval": {
+    "n_views": 1,
+    "include_orthogonal": True,
+    "chunk_size": 4096,
+
+    "in_scale": 1,
+    "s_scale": 1,
+    "sigma_noise": 0,
+    "color_noise": 0,
   },
 }
 

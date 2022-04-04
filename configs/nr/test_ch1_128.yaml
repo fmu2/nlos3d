@@ -6,7 +6,7 @@ dataset:
   size: 128
   background: 0
   target_size: 128
-  color: gray
+  color: g
 
 split: val_unseen_objs_128
 

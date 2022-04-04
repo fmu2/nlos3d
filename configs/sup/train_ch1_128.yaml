@@ -1,0 +1,131 @@
+dataset:
+  root: ./data/synthetic/letters
+  clip: 512
+  size: 128
+  background: [0.05, 0.2]
+  target_size: 128
+  color: g
+
+splits:
+  train: train_128
+  val: val_unseen_poses_128
+
+camera:
+  type: orthographic
+
+  orthographic:
+    size: 2
+    res: 128
+    block_size: 4
+
+model:
+  encoder:
+    type: rsdnet
+
+    rsdnet:
+      in_plane: 1
+      plane: 6
+      in_block: true
+      ds: true
+
+      rsd:
+        t: 256
+        d: 48
+        h: 64
+        w: 64
+        in_plane: 6
+        wall_size: 2
+        bin_len: 0.02
+        zmin: 0.5
+        zmax: 2
+        scale_coef: 1
+
+      actv: leaky_relu
+      norm: none
+      affine: false
+
+  renderer:
+    embedder:
+      embed_p: true
+      embed_d: true
+      embed_z: false
+      p:
+        in_dim: 3
+        include_input: true
+        n_freqs: 10
+      d:
+        in_dim: 2
+        include_input: false
+        n_freqs: 4
+      z:
+        in_dim: 6
+
+    field:
+      type: nerf
+
+      nerf:
+        hid_dim: 64
+        color_dim: 1
+        skips: !!python/list []
+        n_sigma_layers: 2
+        n_color_layers: 1
+        actv: relu
+        film_hid_dim: 16
+        film_n_layers: 2
+        film_actv: leaky_relu
+
+    common:
+      bb_ctr: !!python/list [0, 0, 0.25]
+      bb_size: !!python/list [2, 2, 1.5]
+      inf: 10
+      p_polar: false
+      d_polar: true
+      z_norm: false
+      sigma_transform: relu
+      color_transform: relu
+
+    steady_state:
+      bin_len: 0.02
+      n_bins: 128
+
+opt:
+  batch_size: 4
+  n_workers: 12
+  n_itrs: 25000
+
+  optim_type: adam
+  lr: 1.e-4
+  weight_decay: 0.0
+  beta1: 0.9
+  beta2: 0.999
+
+  clip_grad_norm: 1.0
+
+  sched_type: step
+  milestones: [25000]
+  gamma: 0.1
+
+  mse: 1
+  beta: 1.e-4
+  tv: 0
+
+train:
+  n_views: 4
+  include_orthogonal: true
+
+  n_steps: 2
+  in_scale: 1
+  s_scale: 1
+  sigma_noise: 0
+  color_noise: 0
+
+eval:
+  n_views: 1
+  include_orthogonal: true
+  chunk_size: 4096
+
+  n_steps: 2
+  in_scale: 1
+  s_scale: 1
+  sigma_noise: 0
+  color_noise: 0

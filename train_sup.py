@@ -11,7 +11,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from libs.config import load_config
 from libs.data import collate_fn, make_dataset, cycle
-from libs.worker import EncoderDecoderWorker
+from libs.worker import SupEncoderRendererWorker
 from libs.optimizer import *
 from libs.utils import *
 
@@ -26,12 +26,12 @@ def main(args):
     try:
         config_path = os.path.join(ckpt_path, 'config.yaml')
         check_file(config_path)
-        config = load_config(config_path, mode='train_nr')
+        config = load_config(config_path, mode='train_sup')
         print('config loaded from checkpoint folder')
         config['_resume'] = True
     except:
         check_file(args.config)
-        config = load_config(args.config, mode='train_nr')
+        config = load_config(args.config, mode='train_sup')
         print('config loaded from command line')
 
     # configure GPUs
@@ -43,7 +43,7 @@ def main(args):
     writer = SummaryWriter(os.path.join(ckpt_path, 'tensorboard'))
     rng = fix_random_seed(config.get('seed', 2022))
 
-    ###########################################################################
+    ############################################################################
     """ worker """
 
     itr0 = 0
@@ -54,7 +54,10 @@ def main(args):
             check_file(ckpt_name)
             ckpt = torch.load(ckpt_name)
             
-            worker = EncoderDecoderWorker(ckpt['config']['model'])
+            worker = SupEncoderRendererWorker(
+                cam_cfg=ckpt['config']['camera'],
+                model_cfg=ckpt['config']['model'],
+            )
             worker.load(ckpt)
             worker.cuda(n_gpus)
             
@@ -66,13 +69,19 @@ def main(args):
             config.pop('_resume')
             itr0 = 0
 
-            worker = EncoderDecoderWorker(config['model'])
+            worker = SupEncoderRendererWorker(
+                cam_cfg=config['camera'],
+                model_cfg=config['model'],
+            )
             worker.cuda(n_gpus)
 
             optimizer = make_optimizer(worker, config['opt'])
             scheduler = make_scheduler(optimizer, config['opt'])
     else:
-        worker = EncoderDecoderWorker(config['model'])
+        worker = SupEncoderRendererWorker(
+            cam_cfg=config['camera'],
+            model_cfg=config['model'],
+        )
         worker.cuda(n_gpus)
 
         optimizer = make_optimizer(worker, config['opt'])
@@ -118,32 +127,34 @@ def main(args):
     ############################################################################
     """ Training / Validation """
 
-    train_loss, val_loss = AverageMeter(), AverageMeter()
+    loss_list = ['mse', 'beta', 'tv']
+    train_losses = {k: AverageMeter() for k in loss_list}
+    val_loss = AverageMeter()
 
     metric_list = ['rmse', 'psnr', 'ssim']
-    train_metrics = {k: AverageMeter() for k in metric_list}
-    val_metrics = {k: AverageMeter() for k in metric_list}
+    metrics = {k: AverageMeter() for k in metric_list}
 
     timer = Timer()
-    
+
     for itr in range(itr0 + 1, n_itrs + 1):
         meas, target, _ = next(train_iterator)
-        loss, output_dict, metric_dict = worker.train(
-            meas=meas,
-            target=target,
+        loss_dict, _ = worker.train(
+            meas=meas, 
+            target=target, 
             cfg=config['train'],
         )
 
-        train_loss.update(loss.item())
-        writer.add_scalars('loss', {'train': train_loss.item()}, itr)
+        loss = config['opt']['mse'] * loss_dict['mse'] \
+             + config['opt']['beta'] * loss_dict['beta'] \
+             + config['opt']['tv'] * loss_dict['tv']
 
-        for k in metric_list:
-            train_metrics[k].update(metric_dict[k].item())
-            writer.add_scalars(k, {'train': train_metrics[k].item()}, itr)
+        for k in loss_dict.keys():
+            train_losses[k].update(loss_dict[k].item())
+            writer.add_scalars(k, {'train': train_losses[k].item()}, itr)
 
         optimizer.zero_grad()
         loss.backward()
-        
+
         if config['opt']['clip_grad_norm'] > 0:
             nn.utils.clip_grad_norm_(
                 worker.parameters(), config['opt']['clip_grad_norm']
@@ -158,12 +169,17 @@ def main(args):
             torch.cuda.synchronize()
             t_elapsed = time_str(timer.end())
 
+            _, output_dict, _ = worker.eval(
+                meas=meas, 
+                target=target,
+                cfg=config['eval'],
+            )
+
             log_str = '[{:03d}/{:03d}] '.format(
                 itr // args.print_freq, n_itrs // args.print_freq
             )
-            log_str += 'loss {:.3f} | '.format(train_loss.item())
-            for k in metric_list:
-                log_str += '{:s} {:.2f} | '.format(k, train_metrics[k].item())
+            for k in loss_list:
+                log_str += '{:s} {:.3f} | '.format(k, train_losses[k].item())
             log_str += t_elapsed
             log(log_str, 'log.txt')
 
@@ -179,9 +195,8 @@ def main(args):
             )
 
             writer.flush()
-            train_loss.reset()
-            for k in metric_list:
-                train_metrics[k].reset()
+            for k in loss_list:
+                train_losses[k].reset()
 
             ckpt = worker.save()
             ckpt['itr'] = itr
@@ -201,11 +216,11 @@ def main(args):
                 )
 
                 val_loss.update(loss.item())
-                writer.add_scalars('loss', {'val': val_loss.item()}, itr)
+                writer.add_scalars('mse', {'val': val_loss.item()}, itr)
                 
                 for k in metric_dict.keys():
-                    val_metrics[k].update(metric_dict[k].item())
-                    writer.add_scalars(k, {'val': val_metrics[k].item()}, itr)
+                    metrics[k].update(metric_dict[k].item())
+                    writer.add_scalars(k, {'val': metrics[k].item()}, itr)
 
                 if i % args.print_freq == 0 or i == 1:
                     pred = output_dict['pred']
@@ -226,15 +241,15 @@ def main(args):
                 itr // args.print_freq, n_itrs // args.print_freq
             )
             log_str += 'loss: {:.3f} | '.format(val_loss.item())
-            for k in metric_dict.keys():
-                log_str += '{:s} {:.2f} | '.format(k, val_metrics[k].item())
+            for k in metric_list:
+                log_str += '{:s} {:.2f} | '.format(k, metrics[k].item())
             log_str += t_elapsed
             log(log_str, 'log.txt')
 
             writer.flush()
             val_loss.reset()
             for k in metric_list:
-                val_metrics[k].reset()
+                metrics[k].reset()
 
             ckpt = worker.save()
             ckpt['itr'] = itr

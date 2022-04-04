@@ -271,48 +271,84 @@ class RSDEfficient(RSDBase):
         return x
 
 
-class FCCNet(nn.Module):
+class FFCNet(nn.Module):
 
     def __init__(
         self, 
         t=512,
+        d=64,               # depth dimension of output volume
+        h=128,              # height dimension of input volume
+        w=128,              # width dimension of input volume
         in_plane=1,         # number of input planes
         plane=256,          # number of planes prior to propagation
+        out_plane=3,        # number of output planes
+        n_layers=5,         # number of FFC blocks
+        bottleneck=True,    # if True, use bottleneck blocks
         expansion=4,        # expansion factor for bottleneck
-        n_layers=8,         # number of FFC blocks
         actv="relu",        # activation function
         norm="batch",       # normalization function
         affine=True,        # if True, apply learnable affine transform in norm
+        pe=False,           # if True, apply position encoding
         **kwargs,
     ):
         super(FFCNet, self).__init__()
-        assert t % 2 == 0
+        assert t % 2 == 0, "time dimension must be even"
+        assert h % 2 == 0, "height dimension must be even"
+        assert w % 2 == 0, "weight dimension must be even"
 
-        self.in_ffc = FFC3d(
+        self.t = t
+        self.d = d
+        self.h = h
+        self.w = w
+
+        self.in_plane = in_plane
+        self.plane = plane
+        self.out_plane = out_plane
+
+        self.in_ffc = FFC2d(
             in_plane=in_plane * (t // 2 + 1), 
             plane=plane, 
             actv=actv, 
             norm=norm, 
             affine=affine,
+            pe=pe,
         )
 
-        self.blocks = ResBlockFFC3d(
+        self.blocks = ResBlockFFC2d(
             plane=plane, 
-            expansion=expansion, 
             n_layers=n_layers, 
+            bottleneck=bottleneck,
+            expansion=expansion, 
             actv=actv, 
             norm=norm, 
             affine=affine,
+            pe=pe,
         )
-
-        self.out_conv = nn.Conv3d(plane, plane, 3, 1, 1)
+        self.out_conv = nn.Conv2d(plane, out_plane * d, 3, 1, 1)
 
     def forward(self, x):
-        x = fft.rfft(x, dim=1)          # (bs, c, o, h, w)
-        x = x.flatten(1, 2)             # (bs, c * o, h, w)
-        x = self.blocks(self.in_ffc(x))
+        bs, c, t, h, w = x.shape
+        assert t == self.t, \
+            "time dimension should be {:d}, got {:d}".format(self.t, t)
+        assert h == self.h, \
+            "height dimension should be {:d}, got {:d}".format(self.h, h)
+        assert w == self.w, \
+            "width dimension should be {:d}, got {:d}".format(self.w, w)
+        assert c == self.in_plane, \
+            "feature dimension should be {:d}, got {:d}".format(self.in_plane, c)
+
+        x = fft.rfft(x, dim=2)          # (bs, ci, o, h, w)
+        x = x.flatten(1, 2)             # (bs, ci * o, h, w)
+
+        x = self.in_ffc(x)              # (bs, c, h, w)
+        x = x.reshape(bs, self.plane, h // 2, 2, w // 2, 2)
+        x = x.mean(dim=(-3, -1))        # (bs, c, h/2, w/2)
+
+        x = self.blocks(x)              # (bs, c, h/2, w/2)
         x = torch.abs(x)
-        x = self.out_conv(x)
+        x = self.out_conv(x)            # (bs, co * d, h/2, w/2)
+
+        x = x.reshape(bs, self.out_plane, self.d, *x.shape[-2:])
         return x
 
 
@@ -363,6 +399,7 @@ class RSDNet(nn.Module):
         in_plane=1,         # number of input planes 
         plane=6,            # number of planes prior to propagation
         in_block=True,      # if True, learn conv block before RSD
+        ds=False,           # if True, down-sample the input
         rsd_layer=None,     # RSD kernel
         actv="leaky_relu",  # activation function
         norm="none",        # normalization function
@@ -372,10 +409,11 @@ class RSDNet(nn.Module):
         super(RSDNet, self).__init__()
 
         bias = True if norm == "none" or not affine else False
+        stride = 2 if ds else 1
 
         if in_block:
             self.in_block = nn.Sequential(
-                nn.Conv3d(in_plane, plane, 3, 1, 1, bias=bias),
+                nn.Conv3d(in_plane, plane, 3, stride, 1, bias=bias),
                 make_norm3d(norm, plane, affine),
                 make_actv(actv),
                 nn.Conv3d(plane, plane, 3, 1, 1, bias=bias),
@@ -475,20 +513,20 @@ def make_rsd(config, efficient=True):
         rsd.cuda()
     return rsd
 
+def make_ffc(config):
+    ffc = FFCNet(**config)
+    return ffc
+
 def make_frn(config, efficient=True):
     rsd = make_rsd(config["rsd"], efficient)
     rsd_layer = rsd
     frn = FRN(rsd_layer=rsd_layer, **config)
-    if torch.cuda.is_available():
-        frn.cuda()
     return frn
 
 def make_rsdnet(config, efficient=True):
     rsd = make_rsd(config["rsd"], efficient)
     rsd_layer = rsd
     rsdnet = RSDNet(rsd_layer=rsd_layer, **config)
-    if torch.cuda.is_available():
-        rsdnet.cuda()
     return rsdnet
 
 def make_unet(config, efficient=True):
@@ -500,8 +538,6 @@ def make_unet(config, efficient=True):
             skip_layers.append(make_rsd(config[s], efficient))
 
     unet = UNet(skip_layers=skip_layers, **config)
-    if torch.cuda.is_available():
-        unet.cuda()
     return unet
 
 def make_encoder(config, efficient=True):
@@ -510,6 +546,8 @@ def make_encoder(config, efficient=True):
 
     if config["type"] == "rsd":
         encoder = make_rsd(config["rsd"], efficient)
+    elif config["type"] == "ffc":
+        encoder = make_ffc(config["ffc"])
     elif config["type"] == "frn":
         encoder = make_frn(config["frn"], efficient)
     elif config["type"] == "rsdnet":

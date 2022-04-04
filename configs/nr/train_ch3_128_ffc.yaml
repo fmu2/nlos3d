@@ -1,5 +1,5 @@
 dataset:
-  root: ./data/synthetic/letters
+  root: ./data/synthetic/bikes
   scale: 1
   ds: 1
   clip: 512
@@ -7,7 +7,7 @@ dataset:
   background: [0.05, 0.2]
   target_size: 128
   target_noise: 0.005
-  color: g
+  color: rgb
 
 splits:
   train: train_128
@@ -15,27 +15,23 @@ splits:
 
 model:
   encoder:
-    type: frn
+    type: ffc
 
-    frn:
-      in_plane: 1
-      plane: 3
-
-      rsd:
-        t: 256
-        d: 64
-        h: 64
-        w: 64
-        in_plane: 3
-        wall_size: 2
-        bin_len: 0.02
-        zmin: 0
-        zmax: 2
-        scale_coef: 1
-
-    actv: leaky_relu
-    norm: none
-    affine: false
+    ffc:
+      t: 512
+      d: 64
+      h: 128
+      w: 128
+      in_plane: 3
+      plane: 512
+      out_plane: 8
+      n_layers: 5
+      bottleneck: true
+      expansion: 4
+      actv: relu
+      norm: batch
+      affine: true
+      pe: false
 
   decoder:
     transformer:
@@ -47,19 +43,20 @@ model:
       zmax: 1
 
     renderer:
-      type: v0
+      type: v2
 
-      v0:
-        in_plane: 3
-        out_plane: 1
+      v2:
+        in_plane: 8
+        out_plane: 3
+        min_plane: 4
         actv: leaky_relu
         norm: none
         affine: false
 
 opt:
-  batch_size: 4
+  batch_size: 2
   n_workers: 12
-  n_itrs: 25000
+  n_itrs: 125000
 
   optim_type: adam
   lr: 1.e-4
@@ -71,15 +68,15 @@ opt:
   clip_grad_norm: 1.0
 
   sched_type: step
-  milestones: [25000]
+  milestones: [125000]
   gamma: 0.1
 
 train:
   n_views: 4
   include_orthogonal: true
-  in_scale: null
+  in_scale: 1
 
 eval:
   n_views: 1
   include_orthogonal: true
-  in_scale: null
+  in_scale: 1
