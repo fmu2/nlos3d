@@ -1,3 +1,5 @@
+# needs at least 64 GB of memory
+
 dataset:
   root: ./data/synthetic/letters
   clip: 512

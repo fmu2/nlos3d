@@ -110,6 +110,9 @@ def make_measurement(config):
             elif config['color'] == 'r':    x = x[0:1]
             elif config['color'] == 'g':    x = x[1:2]
             elif config['color'] == 'b':    x = x[2:3]
+        else:
+            if config['color'] == 'rgb':
+                x = np.tile(x, [3, 1, 1, 1])
     except:
         raise ValueError('data loading failed: {:s}'.format(config['path']))
     
@@ -277,6 +280,9 @@ class NLOSDataset(Dataset):
                 elif self.color == 'r': x = x[0:1]
                 elif self.color == 'g': x = x[1:2]
                 elif self.color == 'b': x = x[2:3]
+            else:
+                if self.color == 'rgb':
+                    x = np.tile(x, [3, 1, 1, 1])
         except:
             raise ValueError('measurement loading failed: {:s}'.format(path))
         

@@ -1,5 +1,5 @@
 dataset:
-  root: ./data/synthetic/bikes
+  root: ./data/synthetic/bikes  # ./data/real/objects_1211
   scale: 1
   ds: 1
   clip: 512
@@ -8,7 +8,7 @@ dataset:
   target_size: 256
   color: rgb
 
-split: val_unseen_objs_256
+split: val_unseen_objs_256  # 1cm_768x256x256
 
 eval:
   n_views: 1

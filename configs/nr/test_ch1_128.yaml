@@ -1,5 +1,5 @@
 dataset:
-  root: ./data/synthetic/letters
+  root: ./data/synthetic/letters  # ./data/real/objects_1211
   scale: 1
   ds: 1
   clip: 512
@@ -8,7 +8,7 @@ dataset:
   target_size: 128
   color: g
 
-split: val_unseen_objs_128
+split: val_unseen_objs_128  # 1cm_768x128x128
 
 eval:
   n_views: 1
