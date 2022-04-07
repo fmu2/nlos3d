@@ -18,14 +18,14 @@ camera:
   orthographic:
     size: 2
     res: 256
-    block_size: 4
+    block_size: 8
 
 model:
   encoder:
     type: rsdnet
 
     rsdnet:
-      in_plane: 1
+      in_plane: 3
       plane: 16
       in_block: true
       ds: true
@@ -54,7 +54,7 @@ model:
       p:
         in_dim: 3
         include_input: true
-        n_freqs: 10
+        n_freqs: 10 # 6
       d:
         in_dim: 2
         include_input: false
@@ -66,7 +66,7 @@ model:
       type: nerf
 
       nerf:
-        hid_dim: 64
+        hid_dim: 64 # 32
         color_dim: 3
         skips: !!python/list []
         n_sigma_layers: 2
@@ -104,12 +104,12 @@ opt:
   clip_grad_norm: 1.0
 
   sched_type: step
-  milestones: [125000]
+  milestones: [-1]
   gamma: 0.1
 
   mse: 1
-  beta: 1.e-4
-  tv: 0
+  beta: 1.e-4 # 0
+  tv: 0 # 0.1
 
 train:
   n_views: 4
@@ -118,7 +118,7 @@ train:
   n_steps: 2
   in_scale: 1
   s_scale: 1
-  sigma_noise: 0
+  sigma_noise: 0  # 1
   color_noise: 0
 
 eval:

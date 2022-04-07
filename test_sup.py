@@ -10,11 +10,12 @@ from torch.utils.data import DataLoader
 
 from libs.config import load_config
 from libs.data import collate_fn, make_dataset
-from libs.worker import SupEncoderRendererWorker
+from libs.worker import EncoderRendererWorkerBase
 from libs.utils import *
 
 
 def main(args):
+
     # fetch checkpoint folder
     ckpt_path = os.path.join('ckpt', args.ckpt)
     check_path(ckpt_path)
@@ -42,7 +43,7 @@ def main(args):
     try:
         check_file(ckpt_name)
         ckpt = torch.load(ckpt_name)
-        worker = SupEncoderRendererWorker(
+        worker = EncoderRendererWorkerBase(
             cam_cfg=config.get('camera', ckpt['config']['camera']),
             model_cfg=ckpt['config']['model'],
         )
