@@ -31,9 +31,9 @@ def main(args):
     # torch.backends.cudnn.deterministic = True
 
     ############################################################################
-    """ dataset"""
+    """ dataset """
 
-    x = make_measurement(config['dataset'])          # (1/3, t, h, w)
+    meas = make_measurement(config['meas'])          # (1/3, t, h, w)
     
     ############################################################################
     """ Phasor field RSD reconstruction """
@@ -41,7 +41,7 @@ def main(args):
     rsd = make_rsd(config['rsd'], efficient=True)
     rsd.eval()
     with torch.no_grad():
-        x = rsd(x.unsqueeze(0))
+        x = rsd(meas.unsqueeze(0))
     x = x.squeeze(0).cpu().numpy()                   # (1/3, d, h, w)
 
     # maximum projection along depth axis

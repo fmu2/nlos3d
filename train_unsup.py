@@ -11,7 +11,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from libs.config import load_config
 from libs.data import collate_fn, make_dataset, cycle
-from libs.worker import SupEncoderRendererWorker
+from libs.worker import UnsupEncoderRendererWorker
 from libs.optimizer import *
 from libs.utils import *
 
@@ -27,12 +27,12 @@ def main(args):
     try:
         config_path = os.path.join(ckpt_path, 'config.yaml')
         check_file(config_path)
-        config = load_config(config_path, mode='train_sup')
+        config = load_config(config_path, mode='train_unsup')
         print('config loaded from checkpoint folder')
         config['_resume'] = True
     except:
         check_file(args.config)
-        config = load_config(args.config, mode='train_sup')
+        config = load_config(args.config, mode='train_unsup')
         print('config loaded from command line')
 
     # configure GPUs
@@ -44,7 +44,7 @@ def main(args):
     writer = SummaryWriter(os.path.join(ckpt_path, 'tensorboard'))
     rng = fix_random_seed(config.get('seed', 2022))
 
-    ############################################################################
+    ###########################################################################
     """ worker """
 
     itr0 = 0
@@ -55,7 +55,8 @@ def main(args):
             check_file(ckpt_name)
             ckpt = torch.load(ckpt_name)
             
-            worker = SupEncoderRendererWorker(
+            worker = UnsupEncoderRendererWorker(
+                wall_cfg=ckpt['config']['wall'],
                 cam_cfg=ckpt['config']['camera'],
                 model_cfg=ckpt['config']['model'],
             )
@@ -70,7 +71,8 @@ def main(args):
             config.pop('_resume')
             itr0 = 0
 
-            worker = SupEncoderRendererWorker(
+            worker = UnsupEncoderRendererWorker(
+                wall_cfg=config['wall'],
                 cam_cfg=config['camera'],
                 model_cfg=config['model'],
             )
@@ -79,7 +81,8 @@ def main(args):
             optimizer = make_optimizer(worker, config['opt'])
             scheduler = make_scheduler(optimizer, config['opt'])
     else:
-        worker = SupEncoderRendererWorker(
+        worker = UnsupEncoderRendererWorker(
+            wall_cfg=config['wall'],
             cam_cfg=config['camera'],
             model_cfg=config['model'],
         )
@@ -128,7 +131,7 @@ def main(args):
     ############################################################################
     """ Training / Validation """
 
-    loss_list = ['mse', 'beta', 'tv']
+    loss_list = ['poisson', 'beta', 'tv']
     train_losses = {k: AverageMeter() for k in loss_list}
     val_loss = AverageMeter()
 
@@ -141,11 +144,10 @@ def main(args):
         meas, target, _ = next(train_iterator)
         loss_dict, _ = worker.train(
             meas=meas, 
-            target=target, 
             cfg=config['train'],
         )
 
-        loss = config['opt']['mse'] * loss_dict['mse'] \
+        loss = config['opt']['poisson'] * loss_dict['poisson'] \
              + config['opt']['beta'] * loss_dict['beta'] \
              + config['opt']['tv'] * loss_dict['tv']
 
@@ -186,6 +188,10 @@ def main(args):
 
             pred = output_dict['pred']
             target = output_dict['target']
+
+            pred = torch.clamp(pred, 0, 1)
+            target = torch.clamp(target, 0, 1)
+
             img = torch.stack([pred, target], dim=1).flatten(0, 1)
             if img.dim() == 3:
                 img = img.unsqueeze(1)
@@ -226,6 +232,11 @@ def main(args):
                 if i % args.print_freq == 0 or i == 1:
                     pred = output_dict['pred']
                     target = output_dict['target']
+
+                    # re-normalize
+                    pred = torch.clamp(pred, 0, 1)
+                    target = torch.clamp(target, 0, 1)
+
                     img = torch.stack([pred, target], dim=1).flatten(0, 1)
                     if img.dim() == 3:
                         img = img.unsqueeze(1)

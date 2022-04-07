@@ -6,18 +6,17 @@ import yaml
 import torch
 import torch.nn as nn
 
-from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from libs.config import load_config
-from libs.data import collate_fn, make_dataset, cycle
-from libs.worker import SupEncoderRendererWorker
+from libs.data import make_images
+from libs.worker import SupRendererWorker
 from libs.optimizer import *
 from libs.utils import *
 
 
 def main(args):
-    
+
     # set up checkpoint folder
     os.makedirs('ckpt', exist_ok=True)
     ckpt_path = os.path.join('ckpt', args.name)
@@ -27,24 +26,23 @@ def main(args):
     try:
         config_path = os.path.join(ckpt_path, 'config.yaml')
         check_file(config_path)
-        config = load_config(config_path, mode='train_sup')
+        config = load_config(config_path, mode='train_sup_per_scene')
         print('config loaded from checkpoint folder')
         config['_resume'] = True
     except:
         check_file(args.config)
-        config = load_config(args.config, mode='train_sup')
+        config = load_config(args.config, mode='train_sup_per_scene')
         print('config loaded from command line')
 
     # configure GPUs
     set_gpu(args.gpu)
     n_gpus = torch.cuda.device_count()
-    assert config['opt']['batch_size'] % n_gpus == 0
 
     set_log_path(ckpt_path)
     writer = SummaryWriter(os.path.join(ckpt_path, 'tensorboard'))
     rng = fix_random_seed(config.get('seed', 2022))
 
-    ############################################################################
+    ###########################################################################
     """ worker """
 
     itr0 = 0
@@ -55,7 +53,7 @@ def main(args):
             check_file(ckpt_name)
             ckpt = torch.load(ckpt_name)
             
-            worker = SupEncoderRendererWorker(
+            worker = SupRendererWorker(
                 cam_cfg=ckpt['config']['camera'],
                 model_cfg=ckpt['config']['model'],
             )
@@ -70,7 +68,7 @@ def main(args):
             config.pop('_resume')
             itr0 = 0
 
-            worker = SupEncoderRendererWorker(
+            worker = SupRendererWorker(
                 cam_cfg=config['camera'],
                 model_cfg=config['model'],
             )
@@ -79,7 +77,7 @@ def main(args):
             optimizer = make_optimizer(worker, config['opt'])
             scheduler = make_scheduler(optimizer, config['opt'])
     else:
-        worker = SupEncoderRendererWorker(
+        worker = SupRendererWorker(
             cam_cfg=config['camera'],
             model_cfg=config['model'],
         )
@@ -96,52 +94,21 @@ def main(args):
     ############################################################################
     """ dataset """
 
-    train_set = make_dataset(
-        config['dataset'], split=config['splits']['train'],
-    )
-    train_loader = DataLoader(
-        train_set, 
-        batch_size=config['opt']['batch_size'],
-        num_workers=config['opt']['n_workers'],
-        collate_fn=collate_fn,
-        shuffle=True, 
-        pin_memory=True, 
-        drop_last=True,
-    )
-    train_iterator = cycle(train_loader)
-    print('train data size: {:d}'.format(len(train_set)))
-
-    val_set = make_dataset(
-        config['dataset'], split=config['splits']['val']
-    )
-    val_loader = DataLoader(
-        val_set, 
-        batch_size=config['opt']['batch_size'],
-        num_workers=config['opt']['n_workers'],
-        collate_fn=collate_fn,
-        shuffle=False, 
-        pin_memory=True, 
-        drop_last=True,
-    )
-    print('val data size: {:d}'.format(len(val_set)))
+    gt = make_images(config['target'])              # (v, 1/3, h, w)
 
     ############################################################################
     """ Training / Validation """
 
     loss_list = ['mse', 'beta', 'tv']
     train_losses = {k: AverageMeter() for k in loss_list}
-    val_loss = AverageMeter()
 
     metric_list = ['rmse', 'psnr', 'ssim']
-    metrics = {k: AverageMeter() for k in metric_list}
 
     timer = Timer()
-
+    
     for itr in range(itr0 + 1, n_itrs + 1):
-        meas, target, _ = next(train_iterator)
         loss_dict, _ = worker.train(
-            meas=meas, 
-            target=target, 
+            target=gt,
             cfg=config['train'],
         )
 
@@ -170,12 +137,6 @@ def main(args):
             torch.cuda.synchronize()
             t_elapsed = time_str(timer.end())
 
-            _, output_dict, _ = worker.eval(
-                meas=meas, 
-                target=target,
-                cfg=config['eval'],
-            )
-
             log_str = '[{:03d}/{:03d}] '.format(
                 itr // args.print_freq, n_itrs // args.print_freq
             )
@@ -183,17 +144,6 @@ def main(args):
                 log_str += '{:s} {:.3f} | '.format(k, train_losses[k].item())
             log_str += t_elapsed
             log(log_str, 'log.txt')
-
-            pred = output_dict['pred']
-            target = output_dict['target']
-            img = torch.stack([pred, target], dim=1).flatten(0, 1)
-            if img.dim() == 3:
-                img = img.unsqueeze(1)
-            writer.add_images(
-                tag='train/{:03d}'.format(itr // args.print_freq),
-                img_tensor=img,
-                global_step=itr // args.print_freq,
-            )
 
             writer.flush()
             for k in loss_list:
@@ -207,50 +157,41 @@ def main(args):
             torch.save(ckpt, os.path.join(ckpt_path, 'last.pth'))
             timer.start()
 
-        # val
         if itr % args.val_freq == 0:
-            for i, (meas, target, _) in enumerate(val_loader, 1):
-                loss, output_dict, metric_dict = worker.eval(
-                    meas=meas,
-                    target=target,
-                    cfg=config['eval'],
-                )
+            loss, output_dict, metric_dict = worker.eval( 
+                target=gt,
+                cfg=config['eval'],
+            )
 
-                val_loss.update(loss.item())
-                writer.add_scalars('mse', {'val': val_loss.item()}, itr)
-                
-                for k in metric_dict.keys():
-                    metrics[k].update(metric_dict[k].item())
-                    writer.add_scalars(k, {'val': metrics[k].item()}, itr)
+            writer.add_scalars('mse', {'val': loss.item()}, itr)
+            for k in metric_dict.keys():
+                writer.add_scalars(k, {'val': metric_dict[k].item()}, itr)
 
-                if i % args.print_freq == 0 or i == 1:
-                    pred = output_dict['pred']
-                    target = output_dict['target']
-                    img = torch.stack([pred, target], dim=1).flatten(0, 1)
-                    if img.dim() == 3:
-                        img = img.unsqueeze(1)
-                    writer.add_images(
-                        tag='val/{:03d}/{:03d}'.format(
-                            itr // args.print_freq, i // args.print_freq
-                        ),
-                        img_tensor=img,
-                        global_step=itr // args.print_freq,
-                    )
+            pred = output_dict['pred']
+            target = output_dict['target']
+            pred = torch.clamp(pred, 0, 1)
+            target = torch.clamp(target, 0, 1)
+
+            img = torch.stack([pred, target], dim=1).flatten(0, 1)
+            if img.dim() == 3:
+                img = img.unsqueeze(1)
+            writer.add_images(
+                tag='val/{:03d}'.format(itr),
+                img_tensor=img,
+                global_step=itr,
+            )
 
             t_elapsed = time_str(timer.end())
             log_str = '[{:03d}/{:03d} val] '.format(
                 itr // args.print_freq, n_itrs // args.print_freq
             )
-            log_str += 'loss: {:.3f} | '.format(val_loss.item())
+            log_str += 'loss: {:.3f} | '.format(loss.item())
             for k in metric_list:
-                log_str += '{:s} {:.2f} | '.format(k, metrics[k].item())
+                log_str += '{:s} {:.2f} | '.format(k, metric_dict[k].item())
             log_str += t_elapsed
             log(log_str, 'log.txt')
 
             writer.flush()
-            val_loss.reset()
-            for k in metric_list:
-                metrics[k].reset()
 
             ckpt = worker.save()
             ckpt['itr'] = itr
@@ -270,7 +211,7 @@ if __name__ == '__main__':
                         help='GPU device IDs')
     parser.add_argument('-pf', '--print_freq', type=int, default=1, 
                         help='print frequency (x100 itrs)')
-    parser.add_argument('-vf', '--val_freq', type=int, default=50,
+    parser.add_argument('-vf', '--val_freq', type=int, default=1,
                         help='validation frequency (x100 itrs)')
     args = parser.parse_args()
 

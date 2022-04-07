@@ -2,24 +2,17 @@ import torch
 import torch.nn as nn
 import torch.utils.checkpoint as cp
 
+from .modules import MaxNorm
 from .encoder import make_encoder
 from .renderer import make_renderer
 from .decoder import make_decoder
 
 
 def make_renderer_model(config):
-    t_renderer, s_renderer = make_renderer(config['renderer'])
+    t_renderer, s_renderer = make_renderer(config)
     model = RendererModel(t_renderer, s_renderer)
     if torch.cuda.is_available():
         model.cuda()
-    return model
-
-def load_renderer_model(ckpt):
-    try:
-        model = make_renderer_model(ckpt['config']['model'])
-        model.load_state_dict(ckpt['model'])
-    except:
-        raise ValueError('checkpoint loading failed')
     return model
 
 def make_encoder_renderer_model(config):
@@ -30,14 +23,6 @@ def make_encoder_renderer_model(config):
         model.cuda()
     return model
 
-def load_encoder_renderer_model(ckpt):
-    try:
-        model = make_encoder_renderer_model(ckpt['config']['model'])
-        model.load_state_dict(ckpt['model'])
-    except:
-        raise ValueError('checkpoint loading failed')
-    return model
-
 def make_encoder_decoder_model(config):
     encoder = make_encoder(config['encoder'])
     decoder = make_decoder(config['decoder'])
@@ -45,20 +30,6 @@ def make_encoder_decoder_model(config):
     if torch.cuda.is_available():
         model = model.cuda()
     return model
-
-def load_encoder_decoder_model(ckpt):
-    try:
-        model = make_encoder_decoder_model(ckpt['config']['model'])
-        model.load_state_dict(ckpt['model'])
-    except:
-        raise ValueError('checkpoint loading failed')
-    return model
-
-def normalize_meas(x):
-    bs, c, d, h, w = x.shape
-    x_max = x.amax(dim=(-3, -2, -1), keepdim=True)
-    x = x / (x_max + 1e-5)
-    return x
 
 
 class RendererModel(nn.Module):
@@ -135,6 +106,8 @@ class EncoderRendererModel(nn.Module):
         self.t_renderer = t_renderer    # transient renderer
         self.s_renderer = s_renderer    # steady-state renderer
 
+        self.norm = MaxNorm(per_channel=False)
+
     def _run_forward(self, module):
         def custom_forward(*inputs):
             inputs = module(inputs[0])
@@ -172,7 +145,7 @@ class EncoderRendererModel(nn.Module):
             feat_vol (float tensor, (bs, c, d, h, w)): feature volume.
         """
         if in_scale is None:
-            meas = normalize_meas(meas)
+            meas = self.norm(meas)
         else:
             meas = meas * in_scale
 
@@ -219,6 +192,8 @@ class EncoderDecoderModel(nn.Module):
         self.encoder = encoder
         self.decoder = decoder
 
+        self.norm = MaxNorm(per_channel=True)
+
     def forward(self, meas, rot, in_scale=None):
         """
         Args:
@@ -231,7 +206,7 @@ class EncoderDecoderModel(nn.Module):
             feat_vol (float tensor, (bs, c, d, h, w)): feature volume.
         """
         if in_scale is None:
-            meas = normalize_meas(meas)
+            meas = self.norm(meas)
         else:
             meas = meas * in_scale
         

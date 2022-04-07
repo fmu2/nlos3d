@@ -2,7 +2,6 @@ dataset:
   root: ./data/synthetic/bikes
   clip: 512
   size: 256
-  background: 0
   target_size: 256
   color: rgb
 
@@ -21,6 +20,8 @@ rsd:
   scale_coef: 4
   n_cycles: 4
   ratio: 0.1
+  actv: linear
+  norm: none
 
 batch_size: 1
 n_workers: 12

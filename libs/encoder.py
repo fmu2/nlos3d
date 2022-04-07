@@ -27,6 +27,7 @@ class RSDBase(nn.Module):
         ratio=0.1,          # relative magnitude under which a frequency is discarded
         actv="linear",      # activation function
         norm="max",         # normalization function
+        per_channel=True,   # if True, perform per-channel normalization
         affine=False,       # if True, apply a learnable affine transform in norm
         efficient=False,    # if True, use memory-efficient implementation
         **kwargs,
@@ -103,7 +104,7 @@ class RSDBase(nn.Module):
         self.register_buffer("phase", phase, persistent=False)
 
         self.actv = make_actv(actv)
-        self.norm = make_norm3d(norm, in_plane, affine)
+        self.norm = make_norm3d(norm, in_plane, affine, per_channel)
 
     def _define_wave(self, wavelength):
         # discrete samples of the virtual wavelet

@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 
 from libs.config import load_config
 from libs.data import collate_fn, make_dataset
-from libs.worker import SupEncoderRendererWorker
+from libs.worker import UnsupEncoderRendererWorker
 from libs.utils import *
 
 
@@ -21,7 +21,7 @@ def main(args):
 
     # load config
     check_file(args.config)
-    config = load_config(args.config, mode='test_sup')
+    config = load_config(args.config, mode='test_unsup')
 
     # configure GPUs
     set_gpu(args.gpu)
@@ -42,7 +42,7 @@ def main(args):
     try:
         check_file(ckpt_name)
         ckpt = torch.load(ckpt_name)
-        worker = SupEncoderRendererWorker(
+        worker = UnsupEncoderRendererWorker(
             cam_cfg=config.get('camera', ckpt['config']['camera']),
             model_cfg=ckpt['config']['model'],
         )
@@ -105,14 +105,3 @@ def main(args):
     print('RMSE: {:.3f}'.format(metric_dict['rmse'].item()))
     print('PSNR: {:.3f}'.format(metric_dict['psnr'].item()))
     print('SSIM: {:.3f}'.format(metric_dict['ssim'].item()))
-
-################################################################################
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-ckpt', '--ckpt', help='checkpoint folder')
-    parser.add_argument('-c', '--config', help='config file')
-    parser.add_argument('-g', '--gpu', type=str, default='0', 
-                        help='GPU device IDs')
-    args = parser.parse_args()
-
-    main(args)

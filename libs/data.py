@@ -132,10 +132,13 @@ def make_measurement(config):
 def make_images(config):
     check_file(config['path'])
     ext = config['path'].split('.')[-1]
-    assert ext in ('mat', 'hdr')
+    assert ext in ('jpg', 'mat', 'hdr')
     
     try:
-        if ext == 'mat':
+        if ext == 'jpg':
+            x = cv2.imread(config['path'], cv2.IMREAD_UNCHANGED)
+            x = cv2.cvtColor(x, cv2.COLOR_BGR2RGB)
+        elif ext == 'mat':
             x = sio.loadmat(
                 config['path'], verify_compressed_data_integrity=False
             )['data']
@@ -159,6 +162,7 @@ def make_images(config):
         raise ValueError('data loading failed: {:s}'.format(config['path']))
 
     x = torch.from_numpy(x.astype(np.float32))               # (h, w, v, 1/3)
+    x = x.permute(2, 3, 0, 1)
     if torch.cuda.is_available():
         x = x.cuda(non_blocking=True)
     return x

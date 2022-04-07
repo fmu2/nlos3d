@@ -1,9 +1,7 @@
-dataset:
-  path: ./data/synthetic/test/1cm_600x256x256.hdr
+meas:
+  path: ./data/synthetic/per_scene/bikes/1cm_600x128x128.hdr
   clip: 512
   size: 128
-  scale: 1
-  background: 0
   color: rgb
 
 rsd:

@@ -1,4 +1,4 @@
-# needs at least 16 GB of memory
+# 16GB GPU x 1 (euler20) 
 
 dataset:
   root: ./data/synthetic/letters
@@ -18,7 +18,14 @@ camera:
   orthographic:
     size: 2
     res: 128
-    block_size: 4
+
+wall:
+  size: 2
+  res: 128
+  block_size: 128
+  uv_size: 64
+  foreshortening: False
+  depth: 0.5
 
 model:
   encoder:
@@ -54,7 +61,7 @@ model:
       p:
         in_dim: 3
         include_input: true
-        n_freqs: 10 # 6
+        n_freqs: 6
       d:
         in_dim: 2
         include_input: false
@@ -66,7 +73,7 @@ model:
       type: nerf
 
       nerf:
-        hid_dim: 64
+        hid_dim: 64 # 32
         color_dim: 1
         skips: !!python/list []
         n_sigma_layers: 2
@@ -90,10 +97,15 @@ model:
       bin_len: 0.02
       n_bins: 128
 
+    transient:
+      light: !!python/list [0, 0, -1]
+      bin_range: !!python/list [128, 512]
+      bin_len: 0.01
+
 opt:
   batch_size: 2
   n_workers: 12
-  n_itrs: 25000
+  n_itrs: 50000
 
   optim_type: adam
   lr: 1.e-4
@@ -104,30 +116,29 @@ opt:
   clip_grad_norm: 1.0
 
   sched_type: step
-  milestones: [25000]
+  milestones: [-1]
   gamma: 0.1
 
-  mse: 1
-  beta: 1.e-4
-  tv: 0
+  poisson: 1
+  beta: 0 # 1.e-4
+  tv: 0 # 0.1
 
 train:
-  n_views: 4
-  include_orthogonal: true
-
-  n_steps: 2
-  in_scale: 1
-  s_scale: 1
+  n_steps: 1
+  in_scale: null
+  t_scale: 25465
   sigma_noise: 0
   color_noise: 0
+  bin_range: [128, 512]
 
 eval:
   n_views: 1
   include_orthogonal: true
   chunk_size: 4096
+  normalize: true # false
 
   n_steps: 2
-  in_scale: 1
+  in_scale: null
   s_scale: 1
   sigma_noise: 0
   color_noise: 0

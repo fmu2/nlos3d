@@ -36,13 +36,13 @@ def make_norm2d(name, plane, affine=True):
             'invalid normalization function: {:s}'.format(name)
         )
 
-def make_norm3d(name, plane, affine=True):
+def make_norm3d(name, plane, affine=True, per_channel=True):
     if name == 'batch':
         return nn.BatchNorm3d(plane, affine=affine)
     elif name == 'instance':
         return nn.InstanceNorm3d(plane, affine=affine)
     elif name == 'max':
-        return MaxNorm()
+        return MaxNorm(per_channel=per_channel)
     elif name == 'none':
         return nn.Identity()
     else:
@@ -53,9 +53,10 @@ def make_norm3d(name, plane, affine=True):
 
 class MaxNorm(nn.Module):
     """ Per-channel normalization by max value """
-    def __init__(self, eps=1e-8):
+    def __init__(self, per_channel=True, eps=1e-8):
         super(MaxNorm, self).__init__()
 
+        self.per_channel = per_channel
         self.eps = eps
 
     def forward(self, x):
@@ -68,7 +69,11 @@ class MaxNorm(nn.Module):
         """
         assert x.dim() == 5, \
             'input should be a 5D tensor, got {:d}D'.format(x.dim())
-        x = F.normalize(x, p=float('inf'), dim=(-3, -2, -1))
+
+        if self.per_channel:
+            x = F.normalize(x, p=float('inf'), dim=(-3, -2, -1))
+        else:
+            x = F.normalize(x, p=float('inf'), dim=(-4, -3, -2, -1))
         return x
 
 
