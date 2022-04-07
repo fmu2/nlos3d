@@ -79,7 +79,7 @@ model:
         n_sigma_layers: 2
         n_color_layers: 1
         actv: relu
-        film_hid_dim: 16
+        film_hid_dim: 32
         film_n_layers: 2
         film_actv: leaky_relu
 
