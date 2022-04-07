@@ -202,7 +202,7 @@ def main(args):
             ckpt['config'] = config
             ckpt['optimizer'] = optimizer.state_dict()
             ckpt['scheduler'] = scheduler.state_dict()
-            torch.save(ckpt, os.path.join(ckpt_path, '{:d}.pth'.format(n_itrs)))
+            torch.save(ckpt, os.path.join(ckpt_path, '{:d}.pth'.format(itr)))
 
             timer.start()
 

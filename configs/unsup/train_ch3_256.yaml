@@ -73,7 +73,7 @@ model:
       type: nerf
 
       nerf:
-        hid_dim: 64
+        hid_dim: 64 # 32
         color_dim: 3
         skips: !!python/list []
         n_sigma_layers: 2
@@ -127,7 +127,7 @@ train:
   n_steps: 1
   in_scale: null
   t_scale: 25465
-  sigma_noise: 0
+  sigma_noise: 0  # 1
   color_noise: 0
   bin_range: [128, 384]
 

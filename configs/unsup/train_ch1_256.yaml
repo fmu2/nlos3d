@@ -61,7 +61,7 @@ model:
       p:
         in_dim: 3
         include_input: true
-        n_freqs: 6
+        n_freqs: 6  # 10
       d:
         in_dim: 2
         include_input: false
@@ -127,7 +127,7 @@ train:
   n_steps: 1
   in_scale: null
   t_scale: 25465
-  sigma_noise: 0
+  sigma_noise: 0  # 1
   color_noise: 0
   bin_range: [128, 512]
 
