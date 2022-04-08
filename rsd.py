@@ -75,6 +75,7 @@ def main(args):
         if target is not None:
             target = target[:, 0]
             y = target.cuda(non_blocking=True)
+            y /= y.amax(dim=(1, 2, 3), keepdim=True)
 
         with torch.no_grad():
             x = rsd(meas)                       # (b, 1/3, d, h, w)
