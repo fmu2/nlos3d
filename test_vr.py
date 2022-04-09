@@ -22,7 +22,7 @@ def main(args):
 
     # load config
     check_file(args.config)
-    config = load_config(args.config, mode='test_unsup')
+    config = load_config(args.config, mode='test_vr')
 
     # configure GPUs
     set_gpu(args.gpu)

@@ -678,6 +678,7 @@ class Renderer(nn.Module):
         z_norm=False,           # if True, normalize latent code
         sigma_transform='relu', # output transform for volume density prediction
         color_transform='relu', # output transform for color prediction
+        learn_scale=False,      # if True, learn a scale factor
     ):
         super(Renderer, self).__init__()
 
@@ -692,6 +693,10 @@ class Renderer(nn.Module):
 
         self.sigma_transform = make_actv(sigma_transform)
         self.color_transform = make_actv(color_transform)
+
+        self.scale = None
+        if learn_scale:
+            self.scale = nn.Parameter(torch.zeros(1))
 
         # set up the rendering volume
         assert isinstance(bb_ctr, (list, tuple)) and len(bb_ctr) == 3
@@ -945,6 +950,8 @@ class Renderer(nn.Module):
 
         # evaluate irradiance
         lib['render'] = self.evaluate_irradiance(lib['color'], w, lib) * scale
+        if self.scale is not None:
+            lib['render'] = torch.exp(self.scale) * lib['render']
 
         return lib
         
@@ -971,6 +978,7 @@ class TransientRenderer(Renderer):
         z_norm=False,           # if True, normalize latent code
         sigma_transform='relu', # output transform for predicted volume density
         color_transform='relu', # output transform for predicted color
+        learn_scale=False,      # if True, learn a scale factor
     ):
         super(TransientRenderer, self).__init__(
             p_embed_fn=p_embed_fn, 
@@ -984,6 +992,7 @@ class TransientRenderer(Renderer):
             d_polar=d_polar, 
             sigma_transform=sigma_transform, 
             color_transform=color_transform,
+            learn_scale=learn_scale,
         )
 
         assert isinstance(bin_range, (list, tuple)) and len(bin_range) == 2, \
@@ -1105,6 +1114,7 @@ class SteadyStateRenderer(Renderer):
         z_norm=False,           # if True, normalize latent code
         sigma_transform='relu', # output transform for predicted volume density
         color_transform='relu', # output transform for predicted color
+        learn_scale=False,      # if True, learn a scale factor
         white_background=False, # if True, render with white background
     ):
         super(SteadyStateRenderer, self).__init__(
@@ -1119,6 +1129,7 @@ class SteadyStateRenderer(Renderer):
             d_polar=d_polar, 
             sigma_transform=sigma_transform, 
             color_transform=color_transform,
+            learn_scale=learn_scale,
         )
 
         self.bin_len = bin_len

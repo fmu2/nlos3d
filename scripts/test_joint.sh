@@ -8,6 +8,6 @@
 
 module load nvidia/cuda/11.3
 python setup.py build_ext --inplace
-python test_vr.py -ckpt $1 -c configs/sup/$2.yaml
+python test_vr.py -ckpt $1 -c configs/joint/$2.yaml
 
 # NOTE: set $1 to the name of checkpoint folder

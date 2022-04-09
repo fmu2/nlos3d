@@ -155,6 +155,11 @@ class EncoderRendererModel(nn.Module):
         else:
             feat_vol = self.encoder(meas)
 
+        if isinstance(n_steps, (list, tuple)):
+            t_steps, s_steps = n_steps
+        else:
+            t_steps = s_steps = n_steps
+
         t_lib = None
         if wall_rays is not None:
             assert self.t_renderer is not None, \
@@ -162,7 +167,7 @@ class EncoderRendererModel(nn.Module):
             t_lib = self.t_renderer(
                 rays=wall_rays, 
                 z_vol=feat_vol, 
-                n_steps=n_steps, 
+                n_steps=t_steps, 
                 scale=t_scale, 
                 sigma_noise=sigma_noise, 
                 color_noise=color_noise,
@@ -175,7 +180,7 @@ class EncoderRendererModel(nn.Module):
             s_lib = self.s_renderer(
                 rays=cam_rays, 
                 z_vol=feat_vol, 
-                n_steps=n_steps, 
+                n_steps=s_steps, 
                 scale=s_scale, 
                 sigma_noise=sigma_noise, 
                 color_noise=color_noise,

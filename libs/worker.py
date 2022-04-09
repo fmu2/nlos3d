@@ -1,3 +1,5 @@
+import random
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -5,7 +7,7 @@ import numpy as np
 
 from .model import *
 from .metrics import RMSE, PSNR, SSIM
-from .camera import make_wall, make_camera, sample_views
+from .camera import make_wall, make_camera, sample_views, get_all_views
 from .loss import *
 
 
@@ -59,6 +61,15 @@ class RendererWorkerBase(WorkerBase):
         self.cam = make_camera(cam_cfg)
         self.model = make_renderer_model(model_cfg)
 
+        # buffer all rays
+        Rt_all = get_all_views()
+        rays = []
+        for idx in range(len(Rt_all)):
+            r = self.cam.get_all_rays(Rt_all[idx], invert_z=True)
+            r = torch.from_numpy(r.astype(np.float32))
+            rays.append(r)
+        self.rays = torch.stack(rays)   # (v, h, w, 7)
+
     @torch.no_grad()
     def eval(self, target, cfg):
         """
@@ -76,16 +87,11 @@ class RendererWorkerBase(WorkerBase):
         target = target.cuda(non_blocking=True)
 
         # get all rays originaing from sampled views
-        rays = []
-        for idx in range(len(view_idx)):
-            r = self.cam.get_all_rays(Rt[idx], invert_z=True)
-            r = torch.from_numpy(r.astype(np.float32))  # (h, w, 7)
-            h, w = r.shape[:2]
-            assert h * w % self.n_gpus == 0
-            r = r.flatten(0, 1)                         # (h*w, 7)
-            r = r.reshape(self.n_gpus, h * w // self.n_gpus, 7)
-            rays.append(r)
-        rays = torch.stack(rays, dim=1)                 # (g, v, h*w/g, 7)
+        rays = self.rays[view_idx]
+        rays = rays.flatten(1, 2)                       # (v, h*w, 7)
+        assert h * w % self.n_gpus == 0
+        rays = rays.reshape(v, self.n_gpus, h * w // self.n_gpus, 7)
+        rays = rays.transpose(0, 1)                     # (g, v, h*w/g, 7)
         rays = rays.cuda(non_blocking=True)
         
         # batchify rays
@@ -190,9 +196,12 @@ class UnsupRendererWorker(RendererWorkerBase):
         }
 
         pred = lib['render'].detach()                   # (v, t, 1/3)
+        pred = pred.transpose(-2, -1)                   # (v, 1/3, t)
+        target = hists.transpose(-2, -1)                # (v, 1/3, t)
+
         output_dict = {
             'pred': pred.cpu(),
-            'target': hists.cpu(),
+            'target': target.cpu(),
         }
 
         return loss_dict, output_dict
@@ -209,29 +218,42 @@ class SupRendererWorker(RendererWorkerBase):
             target (float tensor, (v, 1/3, h, w)): target images.
             cfg (dict): training config.
         """
-        # sample target views
-        view_idx, Rt = sample_views(
-            n_views=cfg['n_views'],
-            include_orthogonal=cfg['include_orthogonal'],
-        )
-        target = target[view_idx]
-        v = target.size(0)
-        
-        # sample rays originating from target views
-        pixels, rays = [], []
-        for idx in range(len(view_idx)):
-            px_idx, r = self.cam.sample_rays(Rt[idx], invert_z=True)
-            px_idx = torch.from_numpy(px_idx[0]).long() # (n, 2)
-            px = target[idx, :, px_idx[:, 0], px_idx[:, 1]]
-            px = px.transpose(0, 1)                     # (r, 1/3)
-            pixels.append(px)
-            r = torch.from_numpy(r.astype(np.float32))  # (1, r, 7)
-            n = r.size(1)
-            assert n % self.n_gpus == 0
-            r = r.reshape(self.n_gpus, n // self.n_gpus, 7)
-            rays.append(r)
-        pixels = torch.stack(pixels)                    # (v, r, 1/3)
-        rays = torch.stack(rays, dim=1)                 # (g, v, r/g, 7)
+        # sample rays originating from camera views
+        if cfg.get('n_rays', -1) > 0:
+            rays = self.rays.flatten(0, 2)                  # (k, 7)
+            k = len(rays)
+            assert cfg['n_rays'] < k
+            idx = random.sample(range(k), cfg['n_rays'])
+            rays = rays[None, idx]                          # (1, n, 7)
+            rays = rays.reshape(self.n_gpus, 1, -1, 7)      # (g, 1, n/g, 7)
+            pixels = target.permute(0, 2, 3, 1)             # (v, h, w, 1/3)
+            pixels = pixels.flatten(0, 2)
+            pixels = pixels[None, idx]                      # (1, n, 1/3)
+        else:
+            # sample target views
+            view_idx, Rt = sample_views(
+                n_views=cfg['n_views'],
+                include_orthogonal=cfg['include_orthogonal'],
+            )
+            target = target[view_idx]
+            v = target.size(0)
+            
+            # sample rays originating from target views
+            pixels, rays = [], []
+            for idx in range(len(view_idx)):
+                px_idx, r = self.cam.sample_rays(Rt[idx], invert_z=True)
+                px_idx = torch.from_numpy(px_idx[0]).long() # (n, 2)
+                px = target[idx, :, px_idx[:, 0], px_idx[:, 1]]
+                px = px.transpose(0, 1)                     # (r, 1/3)
+                pixels.append(px)
+                r = torch.from_numpy(r.astype(np.float32))  # (1, r, 7)
+                n = r.size(1)
+                assert n % self.n_gpus == 0
+                r = r.reshape(self.n_gpus, n // self.n_gpus, 7)
+                rays.append(r)
+            pixels = torch.stack(pixels)                    # (v, r, 1/3)
+            rays = torch.stack(rays, dim=1)                 # (g, v, r/g, 7)
+
         pixels = pixels.cuda(non_blocking=True)
         rays = rays.cuda(non_blocking=True)
 
@@ -259,8 +281,8 @@ class SupRendererWorker(RendererWorkerBase):
         }
 
         pred = lib['render'].detach()
-        pred = pred.transpose(-2, -1)                   # (v, 1/3, r)
-        target = pixels.transpose(-2, -1)               # (v, 1/3, r)
+        pred = pred.flatten(0, 1).transpose(0, 1)       # (1/3, v*r (or n))
+        target = pixels.flatten(0, 1).transpose(0, 1)   # (1/3, v*r (or n))
 
         output_dict = {
             'pred': pred.cpu(),
@@ -277,6 +299,15 @@ class EncoderRendererWorkerBase(WorkerBase):
 
         self.cam = make_camera(cam_cfg)
         self.model = make_encoder_renderer_model(model_cfg)
+
+        # buffer all rays
+        Rt_all = get_all_views()
+        rays = []
+        for idx in range(len(Rt_all)):
+            r = self.cam.get_all_rays(Rt_all[idx], invert_z=True)
+            r = torch.from_numpy(r.astype(np.float32))
+            rays.append(r)
+        self.rays = torch.stack(rays)   # (v, h, w, 7)
 
     @torch.no_grad()
     def eval(self, meas, target, cfg):
@@ -298,14 +329,9 @@ class EncoderRendererWorkerBase(WorkerBase):
         target = target.cuda(non_blocking=True)
 
         # get all rays originaing from sampled views
-        rays = []
-        for idx in range(len(view_idx)):
-            r = self.cam.get_all_rays(Rt[idx], invert_z=True)
-            r = torch.from_numpy(r.astype(np.float32))  # (h, w, 7)
-            r = r.flatten(0, 1)                         # (h*w, 7)
-            r = r.repeat(self.n_gpus, 1, 1)             # (g, h*w, 7)
-            rays.append(r)
-        rays = torch.stack(rays, dim=1)                 # (g, v, h*w, 7)
+        rays = self.rays[view_idx]
+        rays = rays.flatten(1, 2)                       # (v, h*w, 7)
+        rays = rays.repeat(self.n_gpus, 1, 1, 1)        # (g, v, h*w, 7)
         rays = rays.cuda(non_blocking=True)
         
         # batchify rays
@@ -411,8 +437,8 @@ class UnsupEncoderRendererWorker(EncoderRendererWorkerBase):
         }
 
         pred = lib['render'].detach()
-        pred = pred.flatten(0, 1)                       # (bs*v, t, 1/3)
-        target = hists.flatten(0, 1)                    # (bs*v, t, 1/3)
+        pred = pred.transpose(-2, -1).flatten(0, 1)     # (bs*v, 1/3, t)
+        target = hists.transpose(-2, -1).flatten(0, 1)  # (bs*v, 1/3, t)
 
         output_dict = {
             'pred': pred.cpu(),
@@ -436,27 +462,40 @@ class SupEncoderRendererWorker(EncoderRendererWorkerBase):
         """
         meas = meas.cuda(non_blocking=True)
 
-        # sample target views
-        view_idx, Rt = sample_views(
-            n_views=cfg['n_views'],
-            include_orthogonal=cfg['include_orthogonal'],
-        )
-        target = target[:, view_idx]
-        bs, v = target.shape[:2]
+        # sample rays originating from camera views
+        if cfg.get('n_rays', -1) > 0:
+            rays = self.rays.flatten(0, 2)                  # (k, 7)
+            k = len(rays)
+            assert cfg['n_rays'] < k
+            idx = random.sample(range(k), cfg['n_rays'])
+            rays = rays[None, idx]                          # (1, n, 7)
+            rays = rays.repeat(self.n_gpus, 1, 1, 1)        # (g, 1, n, 7)
+            pixels = target.permute(0, 1, 3, 4, 2)          # (bs, v, h, w, 1/3)
+            pixels = pixels.flatten(1, 3)
+            pixels = pixels[:, None, idx]                   # (bs, 1, n, 1/3)
+        else:
+            # sample target views
+            view_idx, Rt = sample_views(
+                n_views=cfg['n_views'],
+                include_orthogonal=cfg['include_orthogonal'],
+            )
+            target = target[:, view_idx]
+            bs, v = target.shape[:2]
+            
+            # sample rays originating from target views
+            pixels, rays = [], []
+            for idx in range(len(view_idx)):
+                px_idx, r = self.cam.sample_rays(Rt[idx], invert_z=True)
+                px_idx = torch.from_numpy(px_idx[0]).long() # (n, 2)
+                px = target[:, idx, :, px_idx[:, 0], px_idx[:, 1]]
+                px = px.transpose(1, 2)                     # (bs, r, 1/3)
+                pixels.append(px)
+                r = torch.from_numpy(r.astype(np.float32))  # (1, r, 7)
+                r = r.repeat(self.n_gpus, 1, 1)             # (g, r, 7)
+                rays.append(r)
+            pixels = torch.stack(pixels, dim=1)             # (bs, v, r, 1/3)
+            rays = torch.stack(rays, dim=1)                 # (g, v, r, 7)
         
-        # sample rays originating from target views
-        pixels, rays = [], []
-        for idx in range(len(view_idx)):
-            px_idx, r = self.cam.sample_rays(Rt[idx], invert_z=True)
-            px_idx = torch.from_numpy(px_idx[0]).long() # (n, 2)
-            px = target[:, idx, :, px_idx[:, 0], px_idx[:, 1]]
-            px = px.transpose(1, 2)                     # (bs, r, 1/3)
-            pixels.append(px)
-            r = torch.from_numpy(r.astype(np.float32))  # (1, r, 7)
-            r = r.repeat(self.n_gpus, 1, 1)             # (g, r, 7)
-            rays.append(r)
-        pixels = torch.stack(pixels, dim=1)             # (bs, v, r, 1/3)
-        rays = torch.stack(rays, dim=1)                 # (g, v, r, 7)
         pixels = pixels.cuda(non_blocking=True)
         rays = rays.cuda(non_blocking=True)
 
@@ -483,8 +522,8 @@ class SupEncoderRendererWorker(EncoderRendererWorkerBase):
         }
 
         pred = lib['render'].detach()
-        pred = pred.transpose(-2, -1).flatten(0, 1)     # (bs*v, 1/3, r)
-        target = pixels.transpose(-2, -1).flatten(0, 1) # (bs*v, 1/3, r)
+        pred = pred.flatten(1, 2).transpose(1, 2)       # (bs, 1/3, v*r (or n))
+        target = pixels.flatten(1, 2).transpose(1, 2)   # (bs, 1/3, v*r (or n))
 
         output_dict = {
             'pred': pred.cpu(),
@@ -492,6 +531,125 @@ class SupEncoderRendererWorker(EncoderRendererWorkerBase):
         }
 
         return loss_dict, output_dict
+
+
+class JointEncoderRendererWorker(EncoderRendererWorkerBase):
+
+    def __init__(self, wall_cfg, cam_cfg, model_cfg):
+        super(JointEncoderRendererWorker, self).__init__(cam_cfg, model_cfg)
+
+        self.wall = make_wall(wall_cfg)
+
+    def train(self, meas, target, cfg):
+        """
+        Args:
+            meas (float tensor, (bs, 1/3, t, h, w)): measurements.
+            target (float tensor, (bs, v, 1/3, h, w)): target images.
+            cfg (dict): training config.
+        """
+        meas = meas.cuda(non_blocking=True)
+
+        # sample rays originating from the wall
+        spad_idx, wall_rays = self.wall.sample_rays(invert_z=True)
+        spad_idx = torch.from_numpy(spad_idx[0]).long()     # (v, 2)
+        wall_rays = torch.from_numpy(wall_rays.astype(np.float32))
+        wall_rays = wall_rays.repeat(self.n_gpus, 1, 1, 1)
+        wall_rays = wall_rays.cuda(non_blocking=True)       # (g, v, n, 7)
+        
+        # sample rays originating from camera views
+        if cfg.get('n_rays', -1) > 0:
+            cam_rays = self.rays.flatten(0, 2)              # (k, 7)
+            k = len(cam_rays)
+            assert cfg['n_rays'] < k
+            idx = random.sample(range(k), cfg['n_rays'])
+            cam_rays = cam_rays[None, idx]                  # (1, n, 7)
+            cam_rays = cam_rays.repeat(self.n_gpus, 1, 1, 1)# (g, 1, n, 7)
+            pixels = target.permute(0, 1, 3, 4, 2)          # (bs, v, h, w, 1/3)
+            pixels = pixels.flatten(1, 3)
+            pixels = pixels[:, None, idx]                   # (bs, 1, n, 1/3)
+        else:
+            # sample target views
+            view_idx, Rt = sample_views(
+                n_views=cfg['n_views'],
+                include_orthogonal=cfg['include_orthogonal'],
+            )
+            target = target[:, view_idx]
+            bs, v = target.shape[:2]
+
+            # sample rays originating from target views
+            pixels, cam_rays = [], []
+            for idx in range(len(view_idx)):
+                px_idx, r = self.cam.sample_rays(Rt[idx], invert_z=True)
+                px_idx = torch.from_numpy(px_idx[0]).long() # (n, 2)
+                px = target[:, idx, :, px_idx[:, 0], px_idx[:, 1]]
+                px = px.transpose(1, 2)                     # (bs, r, 1/3)
+                pixels.append(px)
+                r = torch.from_numpy(r.astype(np.float32))  # (1, r, 7)
+                r = r.repeat(self.n_gpus, 1, 1)             # (g, r, 7)
+                cam_rays.append(r)
+            pixels = torch.stack(pixels, dim=1)             # (bs, v, r, 1/3)
+            cam_rays = torch.stack(cam_rays, dim=1)         # (g, v, r, 7)
+
+        pixels = pixels.cuda(non_blocking=True)
+        cam_rays = cam_rays.cuda(non_blocking=True)
+
+        self.model.train()
+        t_lib, s_lib, _ = self.model(
+            meas=meas,
+            wall_rays=wall_rays,
+            cam_rays=cam_rays,
+            n_steps=cfg['n_steps'],
+            in_scale=cfg.get('in_scale', 1),
+            t_scale=cfg.get('t_scale', 1),
+            s_scale=cfg.get('s_scale', 1),
+            sigma_noise=cfg.get('sigma_noise', 0),
+            color_noise=cfg.get('color_noise', 0),
+        )
+
+        # fetch target histograms
+        hists = meas.permute(0, 3, 4, 2, 1)             # (bs, h, w, t, 1/3)
+        b0, b1 = cfg['bin_range']
+        hists = hists[:, spad_idx[:, 0], spad_idx[:, 1], b0:b1]
+        
+        p_loss = poisson_nll_loss(t_lib['render'], hists, reduction='mean')
+        m_loss = F.mse_loss(s_lib['render'], pixels, reduction='mean')
+
+        n_rays = t_lib['hit'].numel() + s_lib['hit'].numel()
+        b_loss = (
+            beta_loss(t_lib['hit'], log_space=True, reduction='sum') + \
+            beta_loss(s_lib['hit'], log_space=True, reduction='sum')
+        ) / n_rays
+        t_loss = (
+            tv_loss(t_lib['alpha'], log_space=True, reduction='sum') + \
+            tv_loss(s_lib['alpha'], log_space=True, reduction='sum')
+        ) / n_rays
+
+        loss_dict = {
+            'poisson': p_loss,
+            'mse': m_loss,
+            'beta': b_loss,
+            'tv': t_loss,
+        }
+
+        pred = t_lib['render'].detach()
+        pred = pred.transpose(-2, -1).flatten(0, 1)     # (bs*v, 1/3, t)
+        target = hists.transpose(-2, -1).flatten(0, 1)  # (bs*v, 1/3, t)
+
+        t_output_dict = {
+            'pred': pred.cpu(),
+            'target': target.cpu(),
+        }
+
+        pred = s_lib['render'].detach()
+        pred = pred.flatten(1, 2).transpose(1, 2)       # (bs, 1/3, v*r)
+        target = pixels.flatten(1, 2).transpose(1, 2)   # (bs, 1/3, v*r)
+
+        s_output_dict = {
+            'pred': pred.cpu(),
+            'target': target.cpu(),
+        }
+
+        return loss_dict, t_output_dict, s_output_dict
 
 
 class EncoderDecoderWorker(WorkerBase):

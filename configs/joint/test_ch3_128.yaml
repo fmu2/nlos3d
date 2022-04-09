@@ -1,0 +1,25 @@
+dataset:
+  root: ./data/synthetic/bikes
+  scale: 1
+  ds: 1
+  clip: 512
+  size: 128
+  background: 0
+  target_size: 128
+  color: rgb
+
+split: val_unseen_objs_128
+
+eval:
+  n_views: 1
+  include_orthogonal: true
+  chunk_size: 4096
+
+  n_steps: 2
+  in_scale: 1
+  s_scale: 1
+  sigma_noise: 0
+  color_noise: 0
+
+batch_size: 1
+n_workers: 12

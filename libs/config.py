@@ -291,6 +291,118 @@ TRAIN_UNSUP_DEFAULTS = {
 }
 
 
+TRAIN_JOINT_DEFAULTS = {
+  "dataset": {
+    "ds": 1,
+    "scale": 1,
+    "background": 0,
+    "target_noise": 0,
+  },
+
+  "camera": {
+    "type": "orthographic",
+    
+    "orthographic": {
+      "size": 2,
+    },
+  },
+
+  "wall": {
+    "size": 2,
+    "uv_size": 64,
+    "foreshortening": False,
+  },
+
+  "model": {
+    "encoder": {},
+
+    "renderer": {
+      "embedder": {
+        "embed_p": True,
+        "embed_d": True,
+        "embed_z": False,
+
+        "p": {
+          "in_dim": 3,
+          "include_input": True,
+          "n_freqs": 6,
+          "log_sampling": True,
+          "freq_scale": 1,
+        },
+        
+        "d": {
+          "in_dim": 2,
+          "include_input": False,
+          "n_freqs": 4,
+          "log_sampling": True,
+          "freq_scale": 1,
+        },
+        
+        "z": {},
+      },
+      
+      "common": {
+        "bb_ctr": [0, 0, 0],
+        "bb_size": [2, 2, 2],
+        "inf": 10,
+        "p_polar": False,
+        "d_polar": True,
+        "z_norm": False,
+        "sigma_transform": "relu",
+        "color_transform": "relu",
+      },
+
+      "transient": {
+        "light": [0, 0, -1],
+      },
+
+      "steady_state": {
+        "bin_len": 0.02,
+        "n_bins": 128,
+      },
+    },
+  },
+
+  "opt": {
+    "batch_size": 4,
+    "n_itrs": 1e5,
+
+    "optim_type": "adam",
+    "lr": 1e-4,
+    "weight_decay": 0,
+    "beta1": 0.9,
+    "beta2": 0.999,
+
+    "clip_grad_norm": 1,
+
+    "sched_type": "step",
+    "milestones": [-1],
+    "gamma": 0.1,
+
+    "poisson": 1.0,
+    "mse": 1.0,
+    "beta": 0.0,
+    "tv": 0.0,
+  },
+
+  "train": {
+    "in_scale": 1,
+    "sigma_noise": 0,
+    "color_noise": 0,
+  },
+
+  "eval": {
+    "n_views": 1,
+    "include_orthogonal": True,
+    "chunk_size": 4096,
+
+    "in_scale": 1,
+    "sigma_noise": 0,
+    "color_noise": 0,
+  },
+}
+
+
 RSD_PER_SCENE_DEFAULTS = {
   "dataset": {
     "ds": 1,
@@ -559,27 +671,7 @@ TEST_NR_DEFAULTS = {
   },
 }
 
-TEST_SUP_DEFAULTS = {
-  "dataset": {
-    "scale": 1,
-    "ds": 1,
-    "background": 0,
-    "target_noise": 0,
-  },
-
-  "eval": {
-    "n_views": 1,
-    "include_orthogonal": True,
-    "chunk_size": 4096,
-
-    "in_scale": 1,
-    "s_scale": 1,
-    "sigma_noise": 0,
-    "color_noise": 0,
-  },
-}
-
-TEST_UNSUP_DEFAULTS = {
+TEST_VR_DEFAULTS = {
   "dataset": {
     "scale": 1,
     "ds": 1,
@@ -618,6 +710,8 @@ def load_default_config(mode="train"):
     config = TRAIN_SUP_DEFAULTS
   elif mode == "train_unsup":
     config = TRAIN_UNSUP_DEFAULTS
+  elif mode == "train_joint":
+    config = TRAIN_JOINT_DEFAULTS
   elif mode == "rsd_per_scene":
     config = RSD_PER_SCENE_DEFAULTS
   elif mode == "train_sup_per_scene":
@@ -626,10 +720,8 @@ def load_default_config(mode="train"):
     config = TRAIN_UNSUP_PER_SCENE_DEFAULTS
   elif mode == "test_nr":
     config = TEST_NR_DEFAULTS
-  elif mode == "test_sup":
-    config = TEST_SUP_DEFAULTS
-  elif mode == "test_unsup":
-    config = TEST_UNSUP_DEFAULTS
+  elif mode == "test_vr":
+    config = TEST_VR_DEFAULTS
   else:
     raise ValueError("invalid default config mode: {:s}".format(mode))
   return config
@@ -647,6 +739,8 @@ def load_config(config_file, mode="train"):
     defaults = TRAIN_SUP_DEFAULTS
   elif mode == "train_unsup":
     defaults = TRAIN_UNSUP_DEFAULTS
+  elif mode == "train_joint":
+    defaults = TRAIN_JOINT_DEFAULTS
   elif mode == "rsd_per_scene":
     defaults = RSD_PER_SCENE_DEFAULTS
   elif mode == "train_sup_per_scene":
@@ -655,10 +749,8 @@ def load_config(config_file, mode="train"):
     defaults = TRAIN_UNSUP_PER_SCENE_DEFAULTS
   elif mode == "test_nr":
     defaults = TEST_NR_DEFAULTS
-  elif mode == "test_sup":
-    defaults = TEST_SUP_DEFAULTS
-  elif mode == "test_unsup":
-    defaults = TEST_UNSUP_DEFAULTS
+  elif mode == "test_vr":
+    defaults = TEST_VR_DEFAULTS
   else:
     raise ValueError("invalid config mode: {:s}".format(mode))
   _merge(defaults, config)
