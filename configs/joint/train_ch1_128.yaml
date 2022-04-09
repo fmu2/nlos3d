@@ -25,7 +25,7 @@ wall:
   res: 128
   block_size: 128
   uv_size: 64
-  foreshortening: False
+  foreshortening: false
   depth: 0.5
 
 model:
@@ -62,7 +62,7 @@ model:
       p:
         in_dim: 3
         include_input: true
-        n_freqs: 6  # 10
+        n_freqs: 10
       d:
         in_dim: 2
         include_input: false
@@ -123,16 +123,13 @@ opt:
 
   poisson: 1.e-4
   mse: 1
-  beta: 0 # 1.e-4
+  beta: 1.e-4
   tv: 0 # 0.1
 
 train:
   n_rays: 4096
-  n_views: 4
-  include_orthogonal: true
-
   n_steps: [1, 2]
-  in_scale: null
+  in_scale: 1
   t_scale: 25465
   s_scale: 1
   sigma_noise: 0  # 1
@@ -146,7 +143,7 @@ eval:
   normalize: false # true
 
   n_steps: 2
-  in_scale: null
+  in_scale: 1
   s_scale: 1
   sigma_noise: 0
   color_noise: 0

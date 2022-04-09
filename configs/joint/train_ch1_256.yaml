@@ -25,7 +25,7 @@ wall:
   res: 256
   block_size: 256
   uv_size: 64
-  foreshortening: False
+  foreshortening: false
   depth: 0.5
 
 model:
@@ -62,7 +62,7 @@ model:
       p:
         in_dim: 3
         include_input: true
-        n_freqs: 6  # 10
+        n_freqs: 10
       d:
         in_dim: 2
         include_input: false
@@ -74,7 +74,7 @@ model:
       type: nerf
 
       nerf:
-        hid_dim: 32 # 64 # 32
+        hid_dim: 64 # 32
         color_dim: 1
         skips: !!python/list []
         n_sigma_layers: 2
@@ -102,6 +102,7 @@ model:
       light: !!python/list [0, 0, -1]
       bin_range: !!python/list [128, 512]
       bin_len: 0.01
+      learn_scale: true
 
 opt:
   batch_size: 2
@@ -120,17 +121,15 @@ opt:
   milestones: [-1]
   gamma: 0.1
 
-  poisson: 1
+  poisson: 1.e-4
   mse: 1
-  beta: 0 # 1.e-4
+  beta: 1.e-4
   tv: 0 # 0.1
 
 train:
-  n_views: 4
-  include_orthogonal: true
-  
+  n_rays: 4096  
   n_steps: [1, 2]
-  in_scale: null
+  in_scale: 1
   t_scale: 25465
   s_scale: 1
   sigma_noise: 0  # 1
@@ -141,10 +140,10 @@ eval:
   n_views: 1
   include_orthogonal: true
   chunk_size: 4096
-  normalize: true # false
+  normalize: false # true
 
   n_steps: 2
-  in_scale: null
+  in_scale: 1
   s_scale: 1
   sigma_noise: 0
   color_noise: 0

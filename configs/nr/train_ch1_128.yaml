@@ -19,14 +19,14 @@ model:
 
     frn:
       in_plane: 1
-      plane: 3
+      plane: 6
 
       rsd:
         t: 256
         d: 64
         h: 64
         w: 64
-        in_plane: 3
+        in_plane: 6
         wall_size: 2
         bin_len: 0.02
         zmin: 0
@@ -50,16 +50,16 @@ model:
       type: v0
 
       v0:
-        in_plane: 3
+        in_plane: 6
         out_plane: 1
         actv: leaky_relu
         norm: none
         affine: false
 
 opt:
-  batch_size: 4
+  batch_size: 2
   n_workers: 12
-  n_itrs: 25000
+  n_itrs: 50000
 
   optim_type: adam
   lr: 1.e-4

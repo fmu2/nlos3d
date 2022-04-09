@@ -120,12 +120,12 @@ opt:
   gamma: 0.1
 
   poisson: 1
-  beta: 0 # 1.e-4
+  beta: 1.e-4
   tv: 0 # 0.1
 
 train:
   n_steps: 1
-  in_scale: null
+  in_scale: 1
   t_scale: 25465
   sigma_noise: 0  # 1
   color_noise: 0
@@ -138,7 +138,7 @@ eval:
   normalize: true # false
 
   n_steps: 2
-  in_scale: null
+  in_scale: 1
   s_scale: 1
   sigma_noise: 0
   color_noise: 0

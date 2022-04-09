@@ -14,6 +14,7 @@ eval:
   n_views: 1
   include_orthogonal: true
   chunk_size: 4096
+  normalize: false
 
   n_steps: 2
   in_scale: 1

@@ -25,7 +25,7 @@ model:
     type: rsdnet
 
     rsdnet:
-      in_plane: 1
+      in_plane: 3
       plane: 16
       in_block: true
       ds: true
@@ -93,7 +93,7 @@ model:
 opt:
   batch_size: 2
   n_workers: 12
-  n_itrs: 125000
+  n_itrs: 200000
 
   optim_type: adam
   lr: 1.e-4
@@ -108,10 +108,11 @@ opt:
   gamma: 0.1
 
   mse: 1
-  beta: 1.e-4 # 0
+  beta: 1.e-4
   tv: 0 # 0.1
 
 train:
+  n_rays: 4096
   n_views: 4
   include_orthogonal: true
 

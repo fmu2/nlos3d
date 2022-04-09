@@ -19,17 +19,17 @@ model:
 
     frn:
       in_plane: 1
-      plane: 3
+      plane: 6
 
       rsd:
         t: 256
-        d: 128
+        d: 96
         h: 128
         w: 128
-        in_plane: 3
+        in_plane: 6
         wall_size: 2
         bin_len: 0.02
-        zmin: 0
+        zmin: 0.5
         zmax: 2
         scale_coef: 2
 
@@ -39,27 +39,27 @@ model:
 
   decoder:
     transformer:
-      d: 128
+      d: 96
       h: 128
       w: 128
       wall_size: 2
-      zmin: -1
+      zmin: -0.5
       zmax: 1
 
     renderer:
       type: v0
 
       v0:
-        in_plane: 3
+        in_plane: 6
         out_plane: 1
         actv: leaky_relu
         norm: none
         affine: false
 
 opt:
-  batch_size: 4
+  batch_size: 2
   n_workers: 12
-  n_itrs: 25000
+  n_itrs: 50000
 
   optim_type: adam
   lr: 1.e-4
@@ -71,11 +71,11 @@ opt:
   clip_grad_norm: 1.0
 
   sched_type: step
-  milestones: [25000]
+  milestones: [-1]
   gamma: 0.1
 
 train:
-  n_views: 4
+  n_views: 2
   include_orthogonal: true
   in_scale: null
 

@@ -93,7 +93,7 @@ model:
 opt:
   batch_size: 4
   n_workers: 12
-  n_itrs: 25000
+  n_itrs: 50000
 
   optim_type: adam
   lr: 1.e-4
