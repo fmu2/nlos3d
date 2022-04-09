@@ -113,9 +113,6 @@ opt:
 
 train:
   n_rays: 4096
-  n_views: 4
-  include_orthogonal: true
-
   n_steps: 2
   in_scale: 1
   s_scale: 1
