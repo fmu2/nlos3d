@@ -28,7 +28,9 @@ def main(args):
     n_gpus = torch.cuda.device_count()
 
     # set up test folder
-    test_path = os.path.join('ckpt', 'test')
+    test_dir = os.path.join('ckpt', 'test')
+    os.makedirs(test_dir, exist_ok=True)
+    test_path = os.path.join(test_dir, config['split'])
     ensure_path(test_path)
 
     rng = fix_random_seed(config.get('seed', 2022))

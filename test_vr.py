@@ -30,7 +30,9 @@ def main(args):
     assert config['batch_size'] % n_gpus == 0
 
     # set up test folder
-    test_path = os.path.join('ckpt', 'test')
+    test_dir = os.path.join('ckpt', 'test')
+    os.makedirs(test_dir, exist_ok=True)
+    test_path = os.path.join(test_dir, config['split'])
     ensure_path(test_path)
 
     rng = fix_random_seed(config.get('seed', 2022))
