@@ -686,12 +686,12 @@ class EncoderDecoderWorker(WorkerBase):
 
         pred, _ = self.model(meas, rot, cfg.get('in_scale', 1))
 
+        loss = F.mse_loss(pred, target, reduction='mean')
+
         pred = torch.clamp(pred.detach(), 0, 1)
         target = torch.clamp(target, 0, 1)
         pred = pred.flatten(0, 1)
         target = target.flatten(0, 1)
-        
-        loss = F.mse_loss(pred, target, reduction='mean')
 
         output_dict = {
             'pred': pred.cpu(),
