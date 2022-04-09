@@ -71,7 +71,7 @@ opt:
   clip_grad_norm: 1.0
 
   sched_type: step
-  milestones: [25000]
+  milestones: [-1]
   gamma: 0.1
 
 train:
