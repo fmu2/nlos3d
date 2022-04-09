@@ -1,7 +1,7 @@
 #!/bin/zsh
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=32
+#SBATCH --cpus-per-task=12
 #SBATCH --time=96:00:00
 #SBATCH --gres=gpu:1
 #SBATCH --partition=research
