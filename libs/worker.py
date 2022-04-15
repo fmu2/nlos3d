@@ -78,10 +78,15 @@ class RendererWorkerBase(WorkerBase):
             cfg (dict): evaluation config.
         """
         # sample target views
-        view_idx, Rt = sample_views(
-            n_views=cfg['n_views'],
-            include_orthogonal=cfg['include_orthogonal'],
-        )
+        if cfg['n_views'] > 0:
+            view_idx, Rt = sample_views(
+                n_views=cfg['n_views'],
+                include_orthogonal=cfg['include_orthogonal'],
+            )
+        else:
+            Rt = get_all_views()
+            view_idx = list(range(len(Rt)))
+
         target = target[view_idx]
         v, _, h, w = target.size()
         target = target.cuda(non_blocking=True)
@@ -320,10 +325,15 @@ class EncoderRendererWorkerBase(WorkerBase):
         meas = meas.cuda(non_blocking=True)
 
         # sample target views
-        view_idx, Rt = sample_views(
-            n_views=cfg['n_views'],
-            include_orthogonal=cfg['include_orthogonal'],
-        )
+        if cfg['n_views'] > 0:
+            view_idx, Rt = sample_views(
+                n_views=cfg['n_views'],
+                include_orthogonal=cfg['include_orthogonal'],
+            )
+        else:
+            Rt = get_all_views()
+            view_idx = list(range(len(Rt)))
+
         target = target[:, view_idx]
         bs, v, _, h, w = target.size()
         target = target.cuda(non_blocking=True)
@@ -368,8 +378,8 @@ class EncoderRendererWorkerBase(WorkerBase):
 
         pred = torch.clamp(pred, 0, 1)
         target = torch.clamp(target, 0, 1)
-        pred = pred.flatten(0, 1)
-        target = target.flatten(0, 1)
+        pred = pred.flatten(0, 1)                       # (bs*v, h, w, 1/3)
+        target = target.flatten(0, 1)                   # (bs*v, h, w, 1/3)
 
         loss = F.mse_loss(pred, target, reduction='mean')
 
@@ -669,10 +679,14 @@ class EncoderDecoderWorker(WorkerBase):
         meas = meas.cuda(non_blocking=True)             # (bs, 1/3, t, h, w)
 
         # sample target views
-        view_idx, Rt = sample_views(
-            n_views=cfg['n_views'],
-            include_orthogonal=cfg['include_orthogonal'],
-        )
+        if cfg['n_views'] > 0:
+            view_idx, Rt = sample_views(
+                n_views=cfg['n_views'],
+                include_orthogonal=cfg['include_orthogonal'],
+            )
+        else:
+            Rt = get_all_views()
+            view_idx = list(range(len(Rt)))
 
         rot = None
         if view_idx != [0]:

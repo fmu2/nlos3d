@@ -30,7 +30,7 @@ def main(args):
     assert config['batch_size'] % n_gpus == 0
 
     # set up test folder
-    test_dir = os.path.join('ckpt', 'test')
+    test_dir = os.path.join('ckpt', args.ckpt, 'test')
     os.makedirs(test_dir, exist_ok=True)
     test_path = os.path.join(test_dir, config['split'])
     ensure_path(test_path)
@@ -92,6 +92,8 @@ def main(args):
 
         pred = output_dict['pred'].numpy()          # (bs, 1/3, h, w)
         target = output_dict['target'].numpy()      # (bs, 1/3, h, w)
+        pred = np.clip(pred, 0, 1)
+        target = np.clip(target, 0, 1)
         pred = pred.transpose(0, 2, 3, 1)           # (bs, h, w, 1/3)
         target = target.transpose(0, 2, 3, 1)       # (bs, h, w, 1/3)
         
@@ -105,9 +107,9 @@ def main(args):
             im.save(os.path.join(test_path, '{:04d}.png'.format(idx)))
             idx += 1
 
-    print('RMSE: {:.3f}'.format(metric_dict['rmse'].item()))
-    print('PSNR: {:.3f}'.format(metric_dict['psnr'].item()))
-    print('SSIM: {:.3f}'.format(metric_dict['ssim'].item()))
+    print('RMSE: {:.3f}'.format(metrics['rmse'].item()))
+    print('PSNR: {:.3f}'.format(metrics['psnr'].item()))
+    print('SSIM: {:.3f}'.format(metrics['ssim'].item()))
 
 ################################################################################
 if __name__ == '__main__':

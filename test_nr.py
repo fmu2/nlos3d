@@ -28,7 +28,7 @@ def main(args):
     n_gpus = torch.cuda.device_count()
 
     # set up test folder
-    test_dir = os.path.join('ckpt', 'test')
+    test_dir = os.path.join('ckpt', args.ckpt, 'test')
     os.makedirs(test_dir, exist_ok=True)
     test_path = os.path.join(test_dir, config['split'])
     ensure_path(test_path)
@@ -100,9 +100,9 @@ def main(args):
             im.save(os.path.join(test_path, '{:04d}.png'.format(idx)))
             idx += 1
 
-    print('RMSE: {:.3f}'.format(metric_dict['rmse'].item()))
-    print('PSNR: {:.3f}'.format(metric_dict['psnr'].item()))
-    print('SSIM: {:.3f}'.format(metric_dict['ssim'].item()))
+    print('RMSE: {:.3f}'.format(metric['rmse'].item()))
+    print('PSNR: {:.3f}'.format(metric['psnr'].item()))
+    print('SSIM: {:.3f}'.format(metric['ssim'].item()))
 
 ################################################################################
 if __name__ == '__main__':

@@ -88,6 +88,7 @@ def main(args):
         pred = pred.transpose(0, 2, 3, 1)       # (b, h, w, 1/3)
 
         if target is not None:
+            target = torch.clamp(target, 0, 1)
             target = target.numpy().transpose(0, 2, 3, 1)
             pred = np.concatenate([target, pred], axis=2)
 
