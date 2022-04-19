@@ -100,9 +100,9 @@ def main(args):
             im.save(os.path.join(test_path, '{:04d}.png'.format(idx)))
             idx += 1
 
-    print('RMSE: {:.3f}'.format(metric['rmse'].item()))
-    print('PSNR: {:.3f}'.format(metric['psnr'].item()))
-    print('SSIM: {:.3f}'.format(metric['ssim'].item()))
+    print('RMSE: {:.3f}'.format(metrics['rmse'].item()))
+    print('PSNR: {:.3f}'.format(metrics['psnr'].item()))
+    print('SSIM: {:.3f}'.format(metrics['ssim'].item()))
 
 ################################################################################
 if __name__ == '__main__':
