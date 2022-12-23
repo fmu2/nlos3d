@@ -146,6 +146,3 @@ If you use our RSD implementation, please also cite the following paper:
   publisher={Nature Publishing Group}
 }
 ```
-=======
-# Under construction
->>>>>>> 81aff4b91e520625ad462da11806a792581c6295
